@@ -61,12 +61,18 @@ Repeat until the user explicitly approves.
 
 ### 6. Update state
 
-```json
-{
-  "step": "impl_plan",
-  "completed": ["init", "interview_setup", "interview", "plan"],
-  "pending": ["impl_plan", "tasks", "execute"]
-}
+Advance pipeline state:
+
+```bash
+python3 -c "
+import json
+with open('.pipeline/state.json') as f: s = json.load(f)
+cur = s['step']
+s['completed'] = s.get('completed', []) + [cur]
+s['pending'] = [x for x in s.get('pending', []) if x != cur]
+s['step'] = s['pending'][0] if s['pending'] else 'done'
+with open('.pipeline/state.json', 'w') as f: json.dump(s, f, indent=2)
+"
 ```
 
 ### 7. Confirm

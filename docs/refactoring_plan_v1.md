@@ -1,7 +1,6 @@
-# Refactoring Plan v1
+# Development Plan v1
 
-Architecture review of the current MVP. Captures what's working, what's fragile, and
-priorities for the next iteration.
+Architecture review of the MVP + ideas for next iterations.
 
 ---
 
@@ -78,8 +77,8 @@ pipeline in an invalid state. LLM will try to interpret garbage.
 ### 5. Context budget detection is approximate
 
 "At ~40-50% estimated usage" — Claude has no precise API for measuring context usage. This
-will work as a rough heuristic at best, not at all at worst. Especially relevant for the
-default executor, which runs in the same session.
+will work as a rough heuristic at best. Especially relevant for the default executor, which
+runs in the same session.
 
 ### 6. No feedback loop from execution to planning
 
@@ -102,8 +101,10 @@ reordering or parallelization if needed.
 ### 9. Ralph integration is manual handoff
 
 "Tell the user to run /ralph-loop" is an instruction, not an integration. Noticeable
-friction: user must manually switch between two skills. Known limitation of Claude Code
-(no skill-to-skill invocation).
+friction: user must manually switch between two skills.
+
+> **Status:** not solvable on our side — waiting for skill-to-skill API from Claude Code.
+> Removed from active backlog.
 
 ### 10. Steps are not idempotent
 
@@ -111,17 +112,11 @@ If pipeline interrupted mid-step (network error, context overflow), re-running
 `/armchair-architect` restarts the step from scratch. For init/interview this is tolerable.
 For execute — partial code changes + restart may create conflicts.
 
-### 11. Bilingual artifacts multiply surface area
+### 11. Bilingual artifacts drift between phases
 
-`_prd_ru.md`, `_plan_ru.md`, `_implementation_plan_ru.md` — 3 extra files to sync. Will
-drift in practice. Sync at phase boundaries helps, but Russian versions become stale between
-phases. Open question: are they needed at all, or is one version in the user's language enough?
-
-### 12. Verification commands are executable by design
-
-JSON is LLM-generated, verification commands execute via Bash. No sandboxing or whitelisting.
-Acceptable for user-approved workflow, but worth being aware of: `implementation_plan.json`
-content is executable.
+`_prd_ru.md`, `_plan_ru.md`, `_implementation_plan_ru.md` — Russian versions go stale
+between phases. Sync at phase boundaries helps but doesn't eliminate drift completely.
+Direction: improve sync mechanism, not remove Russian versions.
 
 ---
 
@@ -136,27 +131,204 @@ Main risk: pipeline linearity will start causing friction on real projects.
 
 ---
 
-## Priority Roadmap
+## New Capabilities
 
-### P1 — High impact, relatively contained
+### Context7 onboarding
 
-1. **Non-linear transitions** — at minimum `back` to previous step without full reset
-2. **Centralized step registry** — single source of truth for step sequence, not duplicated
-   in every step file's state JSON
-3. **Skip paths** — skip interview with a ready PRD, skip planning with a ready plan
+Context7 — MCP plugin with up-to-date library documentation. Enabled globally by the
+author; may be missing on a new machine.
 
-### P2 — Medium impact
+**Onboarding in `steps/01_init.md`:**
 
-4. **Multi-pipeline support** — namespace state by feature (`.pipeline/<feature>/state.json`)
-5. **State validation** — basic schema check on load, graceful error if invalid
-6. **Step idempotency** — detect and handle mid-step restarts cleanly
+```
+Check for context7:
+!`cat ~/.claude/settings.json 2>/dev/null | python3 -c "import json,sys; d=json.load(sys.stdin); print('ok' if d.get('enabledPlugins',{}).get('context7@claude-plugins-official') else 'missing')" 2>/dev/null || echo "missing"`
+```
 
-### P3 — Nice to have
+If `missing` — offer to the user:
+> Context7 is not installed. It's an MCP plugin with up-to-date library documentation —
+> helps write correct code for current dependency versions. Add it? [y/n]
 
-7. **Interview fast path** — accept document dump, infer answers, skip to confirmation
-8. **Execution → planning escalation path** — structured way to say "this task reveals
-   a plan-level problem"
-9. **Task dependencies in JSON schema** — explicit `dependsOn` field
+If yes: append `"context7@claude-plugins-official": true` to `enabledPlugins` in
+`~/.claude/settings.json`. Requires session restart to activate.
+
+**Usage in step files:**
+
+`steps/05_impl_plan.md` — when decomposing into tasks:
+> If MCP context7 is available — use it for up-to-date dependency documentation
+> before describing specific API calls in tasks.
+
+`steps/07_execute.md` — before executing a task:
+> If a task uses an external library and context7 is available — check the current API
+> before writing code.
+
+Principle: soft recommendation (`if available`), no hard dependency.
+
+---
+
+### Critic layer
+
+Two subagent critics at different pipeline points — clean context, no generation history.
+
+```
+PRD → [CRITIC → feeds interview] → interview → plan → impl_plan → [CRITIC] → tasks → execute
+```
+
+**PRD critic (after `01_init.md`)**
+
+Most valuable point: a requirements mistake propagates through every downstream phase.
+
+Catches: contradictions, undefined scope, missing edge cases, absent non-functional
+requirements (auth, error handling, perf), implicit stack assumptions.
+
+Key bonus: findings become the starting question list for interview.
+Result saved to `state.json` as `critique_prd`.
+
+```
+Agent(prompt="You are a product/tech critic. Find problems in this PRD:
+[contents of prd.md]
+Look for: contradictions, undefined scope, missing edge cases,
+absent non-functional requirements, implicit assumptions.
+Output a numbered list of specific problems. No praise.")
+```
+
+**impl_plan critic (after `05_impl_plan.md`)**
+
+Detailed technical review before task slicing — cheap to fix, before execute.
+
+Catches: wrong step order, missing block dependencies, tasks too large for one context
+window, wrong assumptions about existing code.
+
+Result shown to user alongside the approval gate.
+
+```
+Agent(prompt="You are a senior engineer. Find problems in this implementation plan:
+[contents of implementation_plan.md]
+Look for: wrong order, missing steps, tasks too large, missing dependencies,
+wrong stack assumptions.
+Output a numbered list of specific problems. No praise.")
+```
+
+Do not add a critic after `plan.md` — low ROI, impl_plan critic follows shortly.
+
+**Impl/ variations:**
+
+| Impl | Behavior |
+|---|---|
+| `impl/critique/default.md` | Both critics (PRD + impl_plan) |
+| `impl/critique/strict.md` | Stricter: security/perf angle, more questions |
+| `impl/critique/none.md` | Disable (fast iterations) |
+
+Enable with: `/armchair-architect use critique strict`
+
+---
+
+### TDD gate
+
+Optional step between `tasks` and `execute`. User is asked:
+> Use TDD mode? (tests → implementation → refactor for each task) [y/n]
+
+If yes — `impl` switches to `tdd`, state is updated.
+
+**Important:** TDD executor is an injection of TDD protocol on top of ralph, not a
+replacement. Default executor is unsuitable for TDD: by the execute phase the context
+is already filled with interview/planning history. Ralph runs each task in a fresh session.
+
+`impl/execute/tdd.md` = ralph.md + task extension:
+
+```json
+{
+  "id": "task-03",
+  "description": "...",
+  "tdd": {
+    "tests_first": "Write failing tests before writing the implementation",
+    "verify_red": "npm test -- --testPathPattern=task03 must fail",
+    "verify_green": "npm test -- --testPathPattern=task03 must pass"
+  }
+}
+```
+
+Enable with: `/armchair-architect use execute tdd` (requires ralph-loop)
+
+---
+
+### Git worktrees executor
+
+New `impl/execute/worktree.md`:
+- Creates an isolated git worktree for the feature branch before execute
+- Runs tasks in it, opens PR on success
+- Value: no risk of contaminating main branch with partially executed tasks
+
+---
+
+### Parallel subagents
+
+Extension to `implementation_plan.json` schema:
+```json
+{ "id": "task-03", "parallel": true, "group": "api-layer" }
+```
+Tasks with the same `group` + `parallel: true` → launched via Agent tool simultaneously.
+Implemented in `impl/execute/` without touching `steps/`.
+
+---
+
+### armchair-architect-lite
+
+New skill `skills/armchair-architect-lite/SKILL.md` — single file, no state machine.
+Compatible with GitHub Copilot (`.github/skills/`) and Cursor.
+Goal: 60–70% of the value via a structured prompt without pipeline machinery.
+
+Lost: state persistence, swappable impl/, ralph executor, enforcement gates.
+Preserved: PRD → interview → plan → impl → execute structure, chunked interview, language settings.
+
+---
+
+### Other pipeline improvements
+
+**`/armchair-architect back`** — return to the previous step without full reset.
+New routing case in `SKILL.md`: pop last completed, push back to pending.
+
+**Skip paths** — `/armchair-architect skip interview` / `skip planning`.
+Routing in `SKILL.md`: check for artifact file and jump over the step.
+
+**Context handoff** — auto-detect ~40% context usage (heuristic): write `progress.md`,
+suggest starting a new session.
+
+**Ralphex executor** — `impl/execute/ralphex.md`; placeholder until API stabilizes.
+
+**Code review gate** — every N tasks in execute impl: pause and review pass.
+Configurable via state.json.
+
+---
+
+## Roadmap
+
+### P1 — Quick wins (low complexity, high impact)
+
+1. **`back` command** — new routing case in SKILL.md
+2. **Skip paths** — `skip interview` / `skip planning` in SKILL.md
+3. **Context7 onboarding** — check + offer to install in `01_init.md`; recommendation in `05_impl_plan.md` and `07_execute.md`
+
+### P2 — Architectural improvements
+
+4. **Centralized step registry** — remove hardcoded state JSON from each step file
+5. **Critic layer** — `impl/critique/`: two subagent critics (PRD + impl_plan)
+6. **armchair-architect-lite** — for Copilot/Cursor
+7. **TDD gate executor** — `impl/execute/tdd.md` on top of ralph
+8. **Git worktrees executor** — `impl/execute/worktree.md`
+
+### P3 — Complex / deferred
+
+9. **Parallel subagents** — `parallel`/`group` in JSON schema + Agent tool in executor
+10. **Multi-pipeline support** — `.pipeline/<feature>/state.json`
+11. **Context handoff** — auto-detect ~40% context usage, write progress.md
+12. **Code review gate** — pause every N tasks in execute
+13. **Interview fast path** — accept document dump, skip to confirmation
+14. **Escalation execution → planning** — "this task revealed a plan-level problem"
+15. **Task dependencies in JSON schema** — explicit `dependsOn` field
+16. **State validation** — basic schema check on load
+17. **Step idempotency** — handle mid-step restarts cleanly in execute
+18. **Ralphex executor** — `impl/execute/ralphex.md`; waiting for API stabilization
 
 ---
 

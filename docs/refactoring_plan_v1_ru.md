@@ -1,7 +1,6 @@
-# План рефакторинга v1
+# План развития v1
 
-Архитектурный ревью текущего MVP. Фиксирует что работает хорошо, что хрупко и
-приоритеты для следующей итерации.
+Архитектурный ревью MVP + идеи для следующих итераций.
 
 ---
 
@@ -106,7 +105,9 @@ pipeline не предусматривает "поднять проблему н
 
 "Скажи пользователю запустить /ralph-loop" — это инструкция, не интеграция.
 Заметный friction: пользователь вручную переключается между двумя skills.
-Известное ограничение Claude Code (нет skill-to-skill invocation).
+
+> **Статус:** не решается на нашей стороне — ждём skill-to-skill API от Claude Code.
+> Убрано из активного backlog.
 
 ### 10. Шаги не идемпотентны
 
@@ -115,18 +116,11 @@ pipeline не предусматривает "поднять проблему н
 Для init/interview терпимо. Для execute — потенциальные конфликты от partial
 code changes + restart.
 
-### 11. Билингвальность = удвоение артефактов
+### 11. Билингвальность — drift между фазами
 
-`_prd_ru.md`, `_plan_ru.md`, `_implementation_plan_ru.md` — 3 дополнительных файла
-для синхронизации. На практике будут дрейфовать. Sync at phase boundaries помогает,
-но между фазами русские версии устаревают. Открытый вопрос: нужны ли они вообще,
-или достаточно одной версии на языке пользователя?
-
-### 12. Verification commands исполняемые по дизайну
-
-JSON генерируется LLM, verification commands выполняются через Bash. Нет sandboxing
-или whitelisting. Для user-approved workflow приемлемо, но важно осознавать:
-содержимое `implementation_plan.json` — executable by design.
+`_prd_ru.md`, `_plan_ru.md`, `_implementation_plan_ru.md` — русские версии устаревают
+между фазами. Sync at phase boundaries помогает, но не устраняет drift полностью.
+Направление: улучшить механизм sync, а не убирать русские версии.
 
 ---
 
@@ -141,27 +135,204 @@ JSON генерируется LLM, verification commands выполняются 
 
 ---
 
-## Приоритеты развития
+## Новые возможности
 
-### P1 — Высокий impact, относительно локальные изменения
+### Context7 onboarding
 
-1. **Нелинейные переходы** — хотя бы `back` на предыдущий шаг без полного reset
-2. **Централизованный реестр шагов** — единый source of truth, а не дублирование
-   JSON в каждом step файле
-3. **Skip paths** — пропуск interview при готовом PRD, пропуск planning при готовом плане
+Context7 — MCP-плагин с актуальной документацией библиотек. У автора включён глобально,
+на новой машине может отсутствовать.
 
-### P2 — Средний impact
+**Onboarding в `steps/01_init.md`:**
 
-4. **Multi-pipeline support** — неймспейс state по фиче (`.pipeline/<feature>/state.json`)
-5. **Валидация state** — базовая проверка схемы при загрузке, graceful error если невалидно
-6. **Идемпотентность шагов** — определять и корректно обрабатывать прерванные шаги
+```
+Проверь наличие context7:
+!`cat ~/.claude/settings.json 2>/dev/null | python3 -c "import json,sys; d=json.load(sys.stdin); print('ok' if d.get('enabledPlugins',{}).get('context7@claude-plugins-official') else 'missing')" 2>/dev/null || echo "missing"`
+```
 
-### P3 — Nice to have
+Если `missing` — предложить:
+> Context7 не установлен. Это MCP-плагин с актуальной документацией библиотек —
+> помогает писать корректный код для текущих версий зависимостей. Добавить? [y/n]
 
-7. **Fast path для interview** — принять дамп документов, вывести ответы, пропустить к подтверждению
-8. **Escalation path execution → planning** — структурированный способ сказать "эта таска
-   выявила проблему уровня плана"
-9. **Зависимости между задачами в JSON схеме** — явное поле `dependsOn`
+Если согласен: дописать `"context7@claude-plugins-official": true` в `enabledPlugins`
+в `~/.claude/settings.json`. Нужен перезапуск сессии для активации.
+
+**Использование в step файлах:**
+
+`steps/05_impl_plan.md` — при декомпозиции на таски:
+> Если доступен MCP context7 — используй его для актуальной документации зависимостей
+> перед тем как описывать конкретные API вызовы в тасках.
+
+`steps/07_execute.md` — перед выполнением таски:
+> Если таска использует внешнюю библиотеку и доступен context7 — проверь актуальный API
+> прежде чем писать код.
+
+Принцип: мягкая рекомендация (`если доступен`), без hard dependency.
+
+---
+
+### Critic layer
+
+Два subagent-критика в разных точках — чистый контекст, без истории генерации.
+
+```
+PRD → [КРИТИК → кормит interview] → interview → plan → impl_plan → [КРИТИК] → tasks → execute
+```
+
+**Критик PRD (после `01_init.md`)**
+
+Самое ценное место: ошибка в требованиях расходится по всем фазам.
+
+Что ловит: противоречия, неопределённый scope, пропущенные edge cases,
+отсутствующие нефункциональные требования (auth, error handling, perf), неявные допущения о стеке.
+
+Ключевой бонус: находки становятся стартовым списком вопросов для interview.
+Результат сохраняется в `state.json` как `critique_prd`.
+
+```
+Agent(prompt="Ты product/tech critic. Найди проблемы в этом PRD:
+[содержимое prd.md]
+Ищи: противоречия, неопределённый scope, пропущенные edge cases,
+отсутствующие нефункциональные требования, неявные допущения.
+Выдай нумерованный список конкретных проблем. Без похвалы.")
+```
+
+**Критик impl_plan (после `05_impl_plan.md`)**
+
+Детальный технический ревью перед нарезкой задач — дёшево исправить, до execute.
+
+Что ловит: неправильный порядок шагов, пропущенные зависимости между блоками,
+задачи слишком крупные для одного контекстного окна, неверные допущения о коде.
+
+Результат показывается пользователю вместе с approval gate.
+
+```
+Agent(prompt="Ты senior engineer. Найди проблемы в этом implementation plan:
+[содержимое implementation_plan.md]
+Ищи: неправильный порядок, пропущенные шаги, слишком крупные задачи,
+отсутствующие зависимости, неверные допущения о стеке.
+Выдай нумерованный список конкретных проблем. Без похвалы.")
+```
+
+Критик после `plan.md` — не добавлять: низкий ROI, через шаг будет impl_plan критик.
+
+**Impl/ вариации:**
+
+| Impl | Поведение |
+|---|---|
+| `impl/critique/default.md` | Оба критика (PRD + impl_plan) |
+| `impl/critique/strict.md` | Строже: security/perf угол, больше вопросов |
+| `impl/critique/none.md` | Отключить (быстрые итерации) |
+
+Включается: `/armchair-architect use critique strict`
+
+---
+
+### TDD gate
+
+Опциональный шаг между `tasks` и `execute`. Пользователю задаётся вопрос:
+> Использовать TDD режим? (тесты → реализация → рефактор для каждой задачи) [y/n]
+
+Если да — `impl` переключается на `tdd`, state обновляется.
+
+**Важно:** TDD executor — инъекция TDD протокола поверх ralph, не замена.
+Дефолтный executor для TDD не подходит: к фазе execute контекст уже заполнен
+interview/planning фазами. Ralph запускает каждую задачу в свежей сессии.
+
+`impl/execute/tdd.md` = ralph.md + расширение каждой задачи:
+
+```json
+{
+  "id": "task-03",
+  "description": "...",
+  "tdd": {
+    "tests_first": "Напиши failing тесты прежде чем писать реализацию",
+    "verify_red": "npm test -- --testPathPattern=task03 должен упасть",
+    "verify_green": "npm test -- --testPathPattern=task03 должен пройти"
+  }
+}
+```
+
+Включается через: `/armchair-architect use execute tdd` (требует ralph-loop)
+
+---
+
+### Git worktrees executor
+
+Новый `impl/execute/worktree.md`:
+- Создаёт изолированный git worktree для feature branch перед execute
+- Выполняет таски в нём, PR при успехе
+- Ценность: нет риска загрязнить main branch частично выполненными тасками
+
+---
+
+### Параллельные subagents
+
+Расширение схемы `implementation_plan.json`:
+```json
+{ "id": "task-03", "parallel": true, "group": "api-layer" }
+```
+Таски с одинаковым `group` + `parallel: true` → запускаются через Agent tool одновременно.
+Реализуется в `impl/execute/` без изменения `steps/`.
+
+---
+
+### armchair-architect-lite
+
+Новый skill `skills/armchair-architect-lite/SKILL.md` — один файл, без state machine.
+Совместим с GitHub Copilot (`.github/skills/`) и Cursor.
+Цель: 60–70% ценности через структурированный промпт без pipeline machinery.
+
+Что теряется: state persistence, swappable impl/, ralph executor, enforcement gates.
+Что сохраняется: PRD → interview → plan → impl → execute структура, chunked interview, языковые настройки.
+
+---
+
+### Прочие улучшения pipeline
+
+**`/armchair-architect back`** — возврат на предыдущий шаг без полного reset.
+Новый routing case в `SKILL.md`: pop последнего completed, push обратно в pending.
+
+**Skip paths** — `/armchair-architect skip interview` / `skip planning`.
+Routing в `SKILL.md`: проверить наличие файла-артефакта и перепрыгнуть шаг.
+
+**Context handoff** — авто-детект ~40% контекста (эвристика): пишет `progress.md`,
+предлагает начать новую сессию.
+
+**Ralphex executor** — `impl/execute/ralphex.md`; placeholder до стабилизации API.
+
+**Code review gate** — каждые N тасков в execute impl: pause и review pass.
+Настраивается через state.json.
+
+---
+
+## Приоритеты
+
+### P1 — Быстрые wins (низкая сложность, высокий impact)
+
+1. **`back` команда** — новый routing case в SKILL.md
+2. **Skip paths** — `skip interview` / `skip planning` в SKILL.md
+3. **Context7 onboarding** — проверка + предложение установить в `01_init.md`; рекомендация в `05_impl_plan.md` и `07_execute.md`
+
+### P2 — Архитектурные улучшения
+
+4. **Централизованный реестр шагов** — убрать хардкод state JSON из каждого step файла
+5. **Critic layer** — `impl/critique/`: два subagent-критика (PRD + impl_plan)
+6. **armchair-architect-lite** — для Copilot/Cursor
+7. **TDD gate executor** — `impl/execute/tdd.md` поверх ralph
+8. **Git worktrees executor** — `impl/execute/worktree.md`
+
+### P3 — Сложные / отложенные
+
+9. **Параллельные subagents** — `parallel`/`group` в JSON схеме + Agent tool в executor
+10. **Multi-pipeline support** — `.pipeline/<feature>/state.json`
+11. **Context handoff** — авто-детект ~40% контекста, запись progress.md
+12. **Code review gate** — pause каждые N тасков в execute
+13. **Interview fast path** — принять дамп документов, пропустить к подтверждению
+14. **Escalation execution → planning** — "эта таска выявила проблему уровня плана"
+15. **Зависимости в JSON схеме** — явное поле `dependsOn`
+16. **Валидация state** — базовая проверка схемы при загрузке
+17. **Идемпотентность шагов** — корректная обработка прерванных шагов в execute
+18. **Ralphex executor** — `impl/execute/ralphex.md`; ждём стабилизации API
 
 ---
 

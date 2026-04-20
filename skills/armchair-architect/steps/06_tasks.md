@@ -46,7 +46,27 @@ Schema:
 
 Write the generated JSON to `implementation_plan.json`.
 
-### 4. Show summary
+### 4. Ask about TDD mode
+
+Before advancing, ask the user:
+
+> Use TDD mode? Each task will follow: write failing tests → implement → verify green. [y/n]
+>
+> Requires ralph-loop. Adds test coverage but increases execution time per task.
+
+If yes: update `impl.execute` to `tdd` in state.json:
+```bash
+python3 -c "
+import json
+with open('.pipeline/state.json') as f: s = json.load(f)
+s.setdefault('impl', {})['execute'] = 'tdd'
+with open('.pipeline/state.json', 'w') as f: json.dump(s, f, indent=2)
+"
+```
+
+If no: leave `impl.execute` unchanged.
+
+### 5. Show summary
 
 Display:
 > Generated `implementation_plan.json` with <N> tasks across <M> categories.
@@ -57,12 +77,18 @@ Display:
 >
 > Run `/armchair-architect` to start execution.
 
-### 5. Update state
+### 6. Update state
 
-```json
-{
-  "step": "execute",
-  "completed": ["init", "interview_setup", "interview", "plan", "impl_plan", "tasks"],
-  "pending": ["execute"]
-}
+Advance pipeline state:
+
+```bash
+python3 -c "
+import json
+with open('.pipeline/state.json') as f: s = json.load(f)
+cur = s['step']
+s['completed'] = s.get('completed', []) + [cur]
+s['pending'] = [x for x in s.get('pending', []) if x != cur]
+s['step'] = s['pending'][0] if s['pending'] else 'done'
+with open('.pipeline/state.json', 'w') as f: json.dump(s, f, indent=2)
+"
 ```

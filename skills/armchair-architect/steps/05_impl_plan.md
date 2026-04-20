@@ -11,7 +11,13 @@ for user approval. This is where "too coarse", "not needed", and "missing a step
 
 Use the Read tool to read `plan.md`.
 
-### 2. Generate implementation_plan.md
+### 2. Check for context7
+
+Before describing specific API calls in tasks, check if context7 is available.
+If it is, use it to fetch current documentation for the project's dependencies.
+This helps ensure task descriptions reference accurate, up-to-date APIs.
+
+### 3. Generate implementation_plan.md
 
 For each block in `plan.md`, produce a list of concrete steps:
 
@@ -38,11 +44,18 @@ For each block in `plan.md`, produce a list of concrete steps:
 - If a step feels vague, break it down further
 - If two steps are always done together, merge them
 
-### 3. If lang = "ru", also generate _implementation_plan_ru.md
+### 4. If lang = "ru", also generate _implementation_plan_ru.md
 
-### 4. Present for approval
+### 5. Run implementation plan critique (if enabled)
 
-Show `implementation_plan.md` to the user. Ask:
+Read `impl.critique` from state. Load `${CLAUDE_SKILL_DIR}/impl/critique/<critique>.md`
+and follow its **Implementation Plan Critique** section.
+
+If critique is `none`: skip this step silently.
+
+### 6. Present for approval
+
+Show `implementation_plan.md` to the user (with critic findings inline if any). Ask:
 
 > Review the implementation plan:
 > - Any steps too coarse-grained (need splitting)?
@@ -50,22 +63,28 @@ Show `implementation_plan.md` to the user. Ask:
 > - Any missing steps?
 > - Any wrong order within a block?
 >
-> Approve to generate execution tasks, or tell me what to change.
+> Approve to generate execution tasks, or tell me what to fix.
 
-### 5. Apply corrections and re-confirm if needed
+### 7. Apply corrections and re-confirm if needed
 
 Repeat until explicit approval.
 
-### 6. Update state
+### 7. Update state
 
-```json
-{
-  "step": "tasks",
-  "completed": ["init", "interview_setup", "interview", "plan", "impl_plan"],
-  "pending": ["tasks", "execute"]
-}
+Advance pipeline state:
+
+```bash
+python3 -c "
+import json
+with open('.pipeline/state.json') as f: s = json.load(f)
+cur = s['step']
+s['completed'] = s.get('completed', []) + [cur]
+s['pending'] = [x for x in s.get('pending', []) if x != cur]
+s['step'] = s['pending'][0] if s['pending'] else 'done'
+with open('.pipeline/state.json', 'w') as f: json.dump(s, f, indent=2)
+"
 ```
 
-### 7. Confirm
+### 9. Confirm
 
 > Implementation plan approved. Run `/armchair-architect` to generate execution tasks.

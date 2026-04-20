@@ -15,7 +15,13 @@ Read `impl.execute` from state. Default: `default`.
 
 Load the corresponding impl file: `${CLAUDE_SKILL_DIR}/impl/execute/<impl>.md`
 
-### 2. Pre-flight check
+### 2. context7 reminder
+
+If context7 is available, use it when a task involves an external library — check the
+current API before writing code. Do not look up documentation for libraries you are
+already certain about; only use it when the specific API call matters for correctness.
+
+### 3. Pre-flight check
 
 Verify `implementation_plan.json` exists:
 
@@ -34,7 +40,7 @@ cat implementation_plan.json | jq '[.[] | {id, description: .description[:60], p
 Tell the user:
 > Found <N> tasks, <M> remaining (passes: false).
 
-### 3. Ask how to proceed
+### 4. Ask how to proceed
 
 > How would you like to run?
 >
@@ -46,7 +52,7 @@ Tell the user:
 
 Wait for user's reply, then follow the impl file instructions with the chosen task count.
 
-### 4. Context handoff reminder
+### 5. Context handoff reminder
 
 If you notice you're approaching context limits (~40-50%), warn the user:
 
@@ -55,7 +61,7 @@ If you notice you're approaching context limits (~40-50%), warn the user:
 > 2. In the new session, run `/armchair-architect` — it will resume from `execute` step
 > 3. Execution will continue from the first `passes: false` task.
 
-### 5. On task failure or stuck task
+### 6. On task failure or stuck task
 
 If a task fails after 2 fix attempts, propose a split:
 
@@ -68,7 +74,7 @@ If a task fails after 2 fix attempts, propose a split:
 
 Wait for user approval before modifying `implementation_plan.json`.
 
-### 6. Completion
+### 7. Completion
 
 When all tasks have `passes: true`:
 

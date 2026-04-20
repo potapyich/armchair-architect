@@ -1,11 +1,11 @@
 ---
 name: armchair-architect
-description: Feature development pipeline. Guides a project from idea through PRD, planning, and automated execution. Usage: /armchair-architect [status|reset|use <component> <impl>]
+description: Feature development pipeline. Guides a project from idea through PRD, planning, and automated execution. Usage: /armchair-architect [status|reset|back|skip <step>|use <component> <impl>|list]
 ---
 
 Current pipeline state:
 ```json
-!`cat .pipeline/state.json 2>/dev/null || echo '{"step":"init","completed":[],"pending":["init","interview_setup","interview","plan","impl_plan","tasks","execute"],"impl":{"interview":"ask_user_question","execute":"default"}}'`
+!`cat .pipeline/state.json 2>/dev/null || echo '{"step":"init","completed":[],"pending":["init","interview_setup","interview","plan","impl_plan","tasks","execute"],"impl":{"interview":"ask_user_question","execute":"default","critique":"none"}}'`
 ```
 
 Skill directory: ${CLAUDE_SKILL_DIR}
@@ -32,6 +32,70 @@ Do not proceed further.
 Ask the user to confirm: "Reset pipeline state? All progress will be lost. [y/n]"
 If confirmed: use the Bash tool to run `rm -f .pipeline/state.json` and confirm deletion.
 If declined: do nothing.
+
+Do not proceed further.
+
+### If arguments = "back"
+Return to the previous step without full reset.
+
+Read current state. Take the last item from `completed`. Move it back to the front of `pending`.
+Set `step` to that value. Write updated state to `.pipeline/state.json`.
+
+Confirm:
+> Rolled back to **<step>**. Run `/armchair-architect` to re-run this step.
+
+If `completed` is empty, tell the user:
+> Nothing to roll back — pipeline hasn't started yet.
+
+Do not proceed further.
+
+### If arguments starts with "skip "
+
+Parse: `skip <name>` where name is one of: `interview`, `planning`.
+
+**`skip interview`**
+Check that `prd.md` exists:
+```bash
+ls prd.md 2>/dev/null && echo "found" || echo "missing"
+```
+If missing:
+> Cannot skip interview — `prd.md` not found. Run `/armchair-architect` to generate it first.
+> Stop.
+
+If found: remove `interview_setup` and `interview` from `pending`, add them to `completed`
+(if not already there). Set `step` to the next remaining item in `pending`.
+Write updated state. Confirm:
+> Skipped interview. Pipeline continues from **<next step>**.
+
+**`skip planning`**
+Check that `plan.md` exists:
+```bash
+ls plan.md 2>/dev/null && echo "found" || echo "missing"
+```
+If missing:
+> Cannot skip planning — `plan.md` not found. Run `/armchair-architect` to generate it first.
+> Stop.
+
+If found: remove `plan` from `pending`, add to `completed`. Set `step` to next pending item.
+Write updated state. Confirm:
+> Skipped planning. Pipeline continues from **<next step>**.
+
+Do not proceed further.
+
+### If arguments = "list"
+
+Use the Bash tool to list available implementations for each component:
+
+```bash
+echo "=== execute ===" && ls ${CLAUDE_SKILL_DIR}/impl/execute/ | sed 's/\.md//'
+echo "=== interview ===" && ls ${CLAUDE_SKILL_DIR}/impl/interview/ | sed 's/\.md//'
+echo "=== critique ===" && ls ${CLAUDE_SKILL_DIR}/impl/critique/ | sed 's/\.md//'
+```
+
+Then show the current active impl from state:
+```
+Active: execute=<value>, interview=<value>, critique=<value>
+```
 
 Do not proceed further.
 

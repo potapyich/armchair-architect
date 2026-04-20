@@ -22,7 +22,10 @@ Do NOT ask about things already answered in `prd.md` or `CLAUDE.md`.
 
 ### Read current state
 
-Check `interview_mode` and `interview_questions_asked` from state.
+Check `interview_mode`, `interview_questions_asked`, and `critique_prd` from state.
+
+If `critique_prd` is a non-empty array: use those findings as the first questions of the
+interview (they are pre-identified gaps). Count them toward `interview_questions_asked`.
 
 ### Ask questions
 
@@ -73,14 +76,18 @@ When the interview is complete (user chose to finish or limit reached):
 1. Summarize key decisions made during the interview
 2. Update `prd.md` with all clarifications — add detail, resolve "Open Questions" section
 3. If `lang = "ru"`, regenerate `_prd_ru.md` from updated `prd.md`
-4. Update state:
+4. Update state — advance pipeline:
 
-```json
-{
-  "step": "plan",
-  "completed": ["init", "interview_setup", "interview"],
-  "pending": ["plan", "impl_plan", "tasks", "execute"]
-}
+```bash
+python3 -c "
+import json
+with open('.pipeline/state.json') as f: s = json.load(f)
+cur = s['step']
+s['completed'] = s.get('completed', []) + [cur]
+s['pending'] = [x for x in s.get('pending', []) if x != cur]
+s['step'] = s['pending'][0] if s['pending'] else 'done'
+with open('.pipeline/state.json', 'w') as f: json.dump(s, f, indent=2)
+"
 ```
 
 5. Confirm:

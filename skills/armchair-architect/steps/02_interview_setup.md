@@ -31,18 +31,24 @@ Wait for the user's response. Parse their preferences:
 
 ### 3. Update state
 
-```json
-{
-  "step": "interview",
-  "interview_mode": "<chunked_5 or continuous>",
-  "interview_limit": <number or null>,
-  "interview_questions_asked": 0,
-  "completed": ["init", "interview_setup"],
-  "pending": ["interview", "plan", "impl_plan", "tasks", "execute"]
-}
+Advance pipeline state and record interview configuration:
+
+```bash
+python3 -c "
+import json
+with open('.pipeline/state.json') as f: s = json.load(f)
+cur = s['step']
+s['completed'] = s.get('completed', []) + [cur]
+s['pending'] = [x for x in s.get('pending', []) if x != cur]
+s['step'] = s['pending'][0] if s['pending'] else 'done'
+s['interview_mode'] = '<chunked_5 or continuous>'
+s['interview_limit'] = None  # or a number
+s['interview_questions_asked'] = 0
+with open('.pipeline/state.json', 'w') as f: json.dump(s, f, indent=2)
+"
 ```
 
-Write to `.pipeline/state.json`.
+Replace the interview_mode and interview_limit values with the user's choices.
 
 ### 4. Transition
 
