@@ -68,12 +68,14 @@ cd ~/.claude/plugins/doit-cc-plugin && git pull
 
 | File | When | What |
 |---|---|---|
-| `prd.md` | Step 1 | Product requirements (English) |
-| `_prd_ru.md` | Step 1 (if input in Russian) | PRD in Russian |
-| `plan.md` | Step 4 | Strategy plan |
-| `implementation_plan.md` | Step 5 | Detailed steps |
-| `implementation_plan.json` | Step 6 | Execution tasks for ralph |
-| `progress.md` | Step 7 | Execution log (written by ralph) |
+| `prd.md` | Step 1 | Product requirements (English canonical) |
+| `prd_ru.md` | Step 1 (if lang=ru) | PRD in Russian — primary for Russian users |
+| `plan.md` | Step 4 | Strategy plan (English canonical) |
+| `plan_ru.md` | Step 4 (if lang=ru) | Strategy plan in Russian — primary for Russian users |
+| `implementation_plan.md` | Step 5 | Detailed steps (English canonical) |
+| `implementation_plan_ru.md` | Step 5 (if lang=ru) | Detailed steps in Russian |
+| `implementation_plan.json` | Step 5 | Execution tasks (generated after approval) |
+| `progress.md` | Step 6 | Execution log (written by ralph) |
 | `.pipeline/state.json` | Throughout | Pipeline state (gitignored) |
 
 ## Design

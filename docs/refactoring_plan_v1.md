@@ -114,9 +114,9 @@ For execute — partial code changes + restart may create conflicts.
 
 ### 11. Bilingual artifacts drift between phases
 
-`_prd_ru.md`, `_plan_ru.md`, `_implementation_plan_ru.md` — Russian versions go stale
-between phases. Sync at phase boundaries helps but doesn't eliminate drift completely.
-Direction: improve sync mechanism, not remove Russian versions.
+`prd_ru.md`, `plan_ru.md`, `implementation_plan_ru.md` — now primary documents for Russian
+users. English versions (`prd.md` etc.) are derived from confirmed Russian, not the other
+way around. English users get no Russian versions.
 
 ---
 
@@ -305,17 +305,24 @@ Configurable via state.json.
 
 ### P1 — Quick wins (low complexity, high impact)
 
-1. **`back` command** — new routing case in SKILL.md
-2. **Skip paths** — `skip interview` / `skip planning` in SKILL.md
-3. **Context7 onboarding** — check + offer to install in `01_init.md`; recommendation in `05_impl_plan.md` and `07_execute.md`
+1. ✅ **`back` command** — new routing case in SKILL.md
+2. ✅ **Skip paths** — `skip interview` / `skip planning` in SKILL.md
+3. ✅ **Context7 onboarding** — check + offer to install in `02_setup.md`; recommendation in `06_impl_plan.md` and `07_execute.md`
 
 ### P2 — Architectural improvements
 
-4. **Centralized step registry** — remove hardcoded state JSON from each step file
-5. **Critic layer** — `impl/critique/`: two subagent critics (PRD + impl_plan)
-6. **armchair-architect-lite** — for Copilot/Cursor
-7. **TDD gate executor** — `impl/execute/tdd.md` on top of ralph
-8. **Git worktrees executor** — `impl/execute/worktree.md`
+4. ✅ **Centralized step registry** — remove hardcoded state JSON from each step file
+5. ✅ **Critic layer** — `impl/critique/`: two subagent critics (PRD + impl_plan)
+6. ⬜ **armchair-architect-lite** — for Copilot/Cursor
+7. ✅ **TDD gate executor** — `impl/execute/tdd.md` on top of ralph
+8. ✅ **Git worktrees executor** — `impl/execute/worktree.md`
+
+### Additionally implemented (outside original plan)
+
+- ✅ **`list` command** — list available impl variants
+- ✅ **`setup` step (02_setup.md)** — context7, critique mode, TDD mode in one place
+- ✅ **Bilingual order flip** — `prd_ru.md` is primary for ru, `prd.md` derived from it
+- ✅ **impl_plan + tasks merged** — JSON generated immediately after markdown approval
 
 ### P3 — Complex / deferred
 

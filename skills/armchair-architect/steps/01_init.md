@@ -6,26 +6,6 @@ Gather the user's project description and generate a structured PRD.
 
 ## Instructions
 
-### 0. Check for context7
-
-Run:
-```bash
-cat ~/.claude/settings.json 2>/dev/null | python3 -c "import json,sys; d=json.load(sys.stdin); print('ok' if d.get('enabledPlugins',{}).get('context7@claude-plugins-official') else 'missing')" 2>/dev/null || echo "missing"
-```
-
-If the result is `missing`, offer to the user:
-> **context7** is not installed. It's a plugin that fetches up-to-date library documentation
-> directly into context — helps write correct API calls for current dependency versions.
-> Add it to `~/.claude/settings.json`? [y/n]
-
-If yes: read `~/.claude/settings.json`, add `"context7@claude-plugins-official": true` to
-the `enabledPlugins` object, write it back. Then tell the user:
-> context7 added. **Restart this Claude Code session** to activate it, then re-run `/armchair-architect`.
-
-If no: continue without context7.
-
-If the result is `ok`: continue silently (no message needed).
-
 ### 1. Check for existing PRD
 
 Try to read `prd.md` using the Read tool (or equivalent file access).
@@ -63,13 +43,6 @@ Use the Read tool to check if `CLAUDE.md` exists in the current project.
 
 ### 5. Generate PRD
 
-**If input was in Russian:**
-1. Generate `_prd_ru.md` — structured PRD in Russian, based on the user's description.
-2. Generate `prd.md` — English translation/adaptation of `_prd_ru.md`.
-
-**If input was in English:**
-1. Generate `prd.md` directly.
-
 PRD structure:
 ```markdown
 # Product Requirements Document: <Project Name>
@@ -96,18 +69,31 @@ PRD structure:
 <unresolved items — will be addressed in interview>
 ```
 
+**If input was in Russian:**
+1. Generate `prd_ru.md` — structured PRD in Russian, based on the user's description.
+2. Present `prd_ru.md` to the user for review and corrections (step 6).
+3. After confirmation, generate `prd.md` — English canonical derived from the confirmed `prd_ru.md`.
+
+**If input was in English:**
+1. Generate `prd.md` directly. No Russian version.
+
 ### 6. Run PRD critique (if enabled)
 
 Read `impl.critique` from state. Load `${CLAUDE_SKILL_DIR}/impl/critique/<critique>.md`
 and follow its **PRD Critique** section.
 
-If critique is `none`: skip this step silently.
+If critique is `none`: skip silently.
 
 If findings are returned: save them to state as `critique_prd` (they feed into interview).
 
 ### 7. Present and confirm
 
-Show the generated PRD to the user (and critic findings if any). Ask:
+**If lang = "ru":** show `prd_ru.md` to the user (and critic findings if any). Ask:
+> Всё верно? Поправки перед тем как перейдём к настройке интервью?
+
+Apply corrections to `prd_ru.md`, then regenerate `prd.md` from the confirmed Russian.
+
+**If lang = "en":** show `prd.md` (and critic findings if any). Ask:
 > Does this capture your project correctly? Any corrections before we move to interview setup?
 
 Apply any corrections, then proceed.

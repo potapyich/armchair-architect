@@ -5,7 +5,7 @@ description: Feature development pipeline. Guides a project from idea through PR
 
 Current pipeline state:
 ```json
-!`cat .pipeline/state.json 2>/dev/null || echo '{"step":"init","completed":[],"pending":["init","interview_setup","interview","plan","impl_plan","tasks","execute"],"impl":{"interview":"ask_user_question","execute":"default","critique":"none"}}'`
+!`cat .pipeline/state.json 2>/dev/null || echo '{"step":"init","completed":[],"pending":["init","setup","interview_setup","interview","plan","impl_plan","execute"],"impl":{"interview":"ask_user_question","execute":"default","critique":"none"}}'`
 ```
 
 Skill directory: ${CLAUDE_SKILL_DIR}
@@ -112,11 +112,11 @@ Determine the current step from state. Load and execute the corresponding step f
 | Step | File |
 |---|---|
 | init | `${CLAUDE_SKILL_DIR}/steps/01_init.md` |
-| interview_setup | `${CLAUDE_SKILL_DIR}/steps/02_interview_setup.md` |
-| interview | `${CLAUDE_SKILL_DIR}/steps/03_interview.md` |
-| plan | `${CLAUDE_SKILL_DIR}/steps/04_plan.md` |
-| impl_plan | `${CLAUDE_SKILL_DIR}/steps/05_impl_plan.md` |
-| tasks | `${CLAUDE_SKILL_DIR}/steps/06_tasks.md` |
+| setup | `${CLAUDE_SKILL_DIR}/steps/02_setup.md` |
+| interview_setup | `${CLAUDE_SKILL_DIR}/steps/03_interview_setup.md` |
+| interview | `${CLAUDE_SKILL_DIR}/steps/04_interview.md` |
+| plan | `${CLAUDE_SKILL_DIR}/steps/05_plan.md` |
+| impl_plan | `${CLAUDE_SKILL_DIR}/steps/06_impl_plan.md` |
 | execute | `${CLAUDE_SKILL_DIR}/steps/07_execute.md` |
 
 Read the step file using the Read tool, then follow its instructions exactly.

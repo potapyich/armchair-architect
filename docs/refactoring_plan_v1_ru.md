@@ -118,9 +118,9 @@ code changes + restart.
 
 ### 11. Билингвальность — drift между фазами
 
-`_prd_ru.md`, `_plan_ru.md`, `_implementation_plan_ru.md` — русские версии устаревают
-между фазами. Sync at phase boundaries помогает, но не устраняет drift полностью.
-Направление: улучшить механизм sync, а не убирать русские версии.
+`prd_ru.md`, `plan_ru.md`, `implementation_plan_ru.md` — теперь первичные документы для
+русскоязычных пользователей. Английские версии (`prd.md` и т.д.) генерируются из
+подтверждённых русских, а не наоборот. Для английских пользователей русских версий нет.
 
 ---
 
@@ -309,17 +309,24 @@ Routing в `SKILL.md`: проверить наличие файла-артефа
 
 ### P1 — Быстрые wins (низкая сложность, высокий impact)
 
-1. **`back` команда** — новый routing case в SKILL.md
-2. **Skip paths** — `skip interview` / `skip planning` в SKILL.md
-3. **Context7 onboarding** — проверка + предложение установить в `01_init.md`; рекомендация в `05_impl_plan.md` и `07_execute.md`
+1. ✅ **`back` команда** — новый routing case в SKILL.md
+2. ✅ **Skip paths** — `skip interview` / `skip planning` в SKILL.md
+3. ✅ **Context7 onboarding** — проверка + предложение установить в `02_setup.md`; рекомендация в `06_impl_plan.md` и `07_execute.md`
 
 ### P2 — Архитектурные улучшения
 
-4. **Централизованный реестр шагов** — убрать хардкод state JSON из каждого step файла
-5. **Critic layer** — `impl/critique/`: два subagent-критика (PRD + impl_plan)
-6. **armchair-architect-lite** — для Copilot/Cursor
-7. **TDD gate executor** — `impl/execute/tdd.md` поверх ralph
-8. **Git worktrees executor** — `impl/execute/worktree.md`
+4. ✅ **Централизованный реестр шагов** — убрать хардкод state JSON из каждого step файла
+5. ✅ **Critic layer** — `impl/critique/`: два subagent-критика (PRD + impl_plan)
+6. ⬜ **armchair-architect-lite** — для Copilot/Cursor
+7. ✅ **TDD gate executor** — `impl/execute/tdd.md` поверх ralph
+8. ✅ **Git worktrees executor** — `impl/execute/worktree.md`
+
+### Дополнительно реализовано (вне оригинального плана)
+
+- ✅ **`list` команда** — список доступных impl вариантов
+- ✅ **`setup` шаг (02_setup.md)** — context7, critique mode, TDD mode в одном месте
+- ✅ **Билингвальный порядок** — `prd_ru.md` первичен для ru, `prd.md` выводится из него
+- ✅ **Слияние impl_plan + tasks** — JSON генерируется сразу после одобрения markdown
 
 ### P3 — Сложные / отложенные
 

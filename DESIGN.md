@@ -16,10 +16,10 @@ plugin API integration deferred until API stabilizes.
 
 User describes the project in free form (dumps everything they know). Claude organizes it.
 
-- Input in Russian → generate `_prd_ru.md` → derive `prd.md` from it
+- Input in Russian → generate `prd_ru.md` → user confirms → derive `prd.md` from confirmed Russian
 - Input in English → generate `prd.md` directly
-- `_prd_ru.md` is a derived artifact; synced with `prd.md` at phase boundaries only
-- Manual sync: explicit user command with direction (`"sync from prd.md to _prd_ru.md"`)
+- `prd_ru.md` is the primary artifact for Russian users; `prd.md` is derived from it
+- For English users: only `prd.md` is generated, no Russian versions
 
 **Step 2 — CLAUDE.md**
 
@@ -54,7 +54,7 @@ may have missed. Absorbs questions deferred from Step 3.
 
 Goal: `prd.md` detailed enough that any senior engineer executes without clarification.
 
-After interview: update `prd.md` and sync `_prd_ru.md` (phase boundary sync).
+After interview: update `prd_ru.md` first (if lang=ru), then regenerate `prd.md` from it.
 
 ---
 
@@ -65,26 +65,25 @@ After interview: update `prd.md` and sync `_prd_ru.md` (phase boundary sync).
 High-level plan: work order, dependencies, architectural blocks.
 Gate: user approval required before proceeding.
 Catches errors like: wrong sequence, missing whole modules.
-Generates `plan.md` + `_plan_ru.md`.
+Generates `plan_ru.md` first (if lang=ru), user approves, then `plan.md` derived from it. English users: `plan.md` only.
 
-**Step 7 — implementation_plan.md (Tactics)**
+**Step 7 — implementation_plan.md + implementation_plan.json**
 
-Each block from `plan.md` broken into concrete steps. Tasks scoped to be evaluable.
-Gate: user approval required before proceeding.
+Each block from `plan.md` broken into concrete steps. Gate: user approval required.
 Catches errors like: too coarse-grained, unnecessary steps, missing steps.
-Generates `implementation_plan.md` + `_implementation_plan_ru.md`.
+Generates `implementation_plan_ru.md` first (if lang=ru), user approves, then `implementation_plan.md` derived from it. English users: `implementation_plan.md` only.
 
-**Step 8 — implementation_plan.json (Execution)**
-
-Generated from approved `implementation_plan.md`.
+JSON is generated immediately after approval — strict mechanical conversion, no interpretation.
+If the user later wants to change the plan, they edit `implementation_plan.md` and re-run
+this step to regenerate the JSON.
 
 Each task:
 ```json
 {
-  "id": "task-01",
+  "id": "1.1",
   "category": "backend",
   "description": "...",
-  "verification": ["npm test", "curl http://localhost:3000/health"],
+  "verification": ["npm test -- --grep 'name'", "curl http://localhost:3000/health"],
   "passes": false
 }
 ```
@@ -123,12 +122,12 @@ ralph 10
 | File | Level | What | Who writes |
 |---|---|---|---|
 | `prd.md` | requirements | requirements in English | Claude |
-| `_prd_ru.md` | requirements | requirements in Russian (derived) | Claude, sync at phase boundaries |
+| `prd_ru.md` | requirements | requirements in Russian (primary for ru users) | Claude + user confirms |
 | `CLAUDE.md` | context | permanent per-session project context | user |
 | `plan.md` | strategy | high-level plan, approved | Claude → user approves |
-| `_plan_ru.md` | strategy | plan in Russian (derived) | Claude |
+| `plan_ru.md` | strategy | plan in Russian (primary for ru users) | Claude + user confirms |
 | `implementation_plan.md` | tactics | detailed steps, approved | Claude → user approves |
-| `_implementation_plan_ru.md` | tactics | detailed plan in Russian (derived) | Claude |
+| `implementation_plan_ru.md` | tactics | detailed plan in Russian (primary for ru users) | Claude + user confirms |
 | `implementation_plan.json` | execution | tasks for ralph | Claude from approved impl plan |
 | `progress.md` | runtime | execution log | ralph automatically |
 | `.pipeline/state.json` | runtime | pipeline state (gitignored) | pipeline |
@@ -179,7 +178,7 @@ SKILL.md orchestrator (reads state.json, selects step)
   "interview_mode": "chunked_5",
   "interview_questions_asked": 7,
   "completed": ["prd_draft", "clarify"],
-  "pending": ["interview", "plan", "impl_plan", "tasks", "execute"],
+  "pending": ["interview", "plan", "impl_plan", "execute"],
   "impl": {
     "interview": "ask_user_question",
     "execute": "ralph"

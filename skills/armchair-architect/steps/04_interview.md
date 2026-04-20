@@ -74,8 +74,9 @@ Ask all questions, then give one final assessment at the end.
 When the interview is complete (user chose to finish or limit reached):
 
 1. Summarize key decisions made during the interview
-2. Update `prd.md` with all clarifications — add detail, resolve "Open Questions" section
-3. If `lang = "ru"`, regenerate `_prd_ru.md` from updated `prd.md`
+2. Update PRD with all clarifications — add detail, resolve "Open Questions" section:
+   - If `lang = "ru"`: update `prd_ru.md` first, then regenerate `prd.md` from it
+   - If `lang = "en"`: update `prd.md` only
 4. Update state — advance pipeline:
 
 ```bash

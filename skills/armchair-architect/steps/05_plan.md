@@ -39,13 +39,23 @@ Structure:
 <Things that could affect the plan>
 ```
 
-### 3. If lang = "ru", also generate _plan_ru.md
+### 3. Generate plan (language-aware)
 
-Mirror structure, content in Russian.
+**If lang = "ru":**
+1. Generate `plan_ru.md` — Russian version of the plan.
+2. Present `plan_ru.md` for approval (step 4).
+3. After approval, generate `plan.md` — English canonical from the approved Russian.
+
+**If lang = "en":**
+1. Generate `plan.md` directly. No Russian version.
 
 ### 4. Present for approval
 
-Show `plan.md` to the user. Ask:
+**If lang = "ru":** show `plan_ru.md` to the user. Ask:
+> Правильный порядок работы? Пропущенные блоки? Лишние или объединяемые блоки?
+> Одобряй или говори что поменять.
+
+**If lang = "en":** show `plan.md` to the user. Ask:
 
 > Does this plan look right?
 > - Correct order of work?
@@ -56,8 +66,8 @@ Show `plan.md` to the user. Ask:
 
 ### 5. Apply corrections and re-confirm if needed
 
-If the user requests changes, apply them and show the updated plan.
-Repeat until the user explicitly approves.
+If the user requests changes: apply to the language-primary version (`plan_ru.md` or `plan.md`),
+then regenerate the canonical English if needed. Repeat until explicit approval.
 
 ### 6. Update state
 
