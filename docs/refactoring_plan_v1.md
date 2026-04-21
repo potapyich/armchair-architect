@@ -335,7 +335,7 @@ Configurable via state.json.
 14. ✅ **Escalation execution → planning** — "this task revealed a plan-level problem"
 15. ✅ **Task dependencies in JSON schema** — explicit `dependsOn` field
 16. ✅ **State validation** — basic schema check on load
-17. **Step idempotency** — handle mid-step restarts cleanly in execute
+17. ✅ **Step idempotency** — handle mid-step restarts cleanly in execute
 18. **Ralphex executor** — `impl/execute/ralphex.md`; waiting for API stabilization
 
 ---

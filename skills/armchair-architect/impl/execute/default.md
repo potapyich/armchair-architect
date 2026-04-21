@@ -28,6 +28,28 @@ Track how many tasks you complete in this run. Stop after N tasks even if more r
 cat implementation_plan.json
 ```
 
+Check for an interrupted task — any task with `in_progress: true`:
+
+```bash
+cat implementation_plan.json | jq '[.[] | select(.in_progress == true)] | first'
+```
+
+If found, tell the user:
+> Task **<id>** appears to have been interrupted mid-execution.
+>
+> A) Try verification first — code may already be written
+> B) Re-implement from scratch
+
+Wait for choice.
+- **A:** skip to step 5 (Run verification) for this task.
+- **B:** clear `in_progress`, proceed normally from step 3.
+
+```bash
+cat implementation_plan.json | jq '
+  map(if .id == "<task_id>" then .in_progress = false else . end)
+' > /tmp/plan_update.json && mv /tmp/plan_update.json implementation_plan.json
+```
+
 Build the set of completed task ids (`passes: true`).
 
 A task is **ready** if:
@@ -110,6 +132,14 @@ Tell the user:
 
 ### 4. Implement the task
 
+Mark task as in-progress before writing any code:
+
+```bash
+cat implementation_plan.json | jq '
+  map(if .id == "<task_id>" then .in_progress = true else . end)
+' > /tmp/plan_update.json && mv /tmp/plan_update.json implementation_plan.json
+```
+
 Read relevant files, understand the context, write the code.
 
 Guidelines:
@@ -132,19 +162,24 @@ If a command fails:
 
 ### 6. Mark task result
 
-**On pass:** Update `implementation_plan.json` — set `"passes": true` for this task id.
+**On pass:** Update `implementation_plan.json` — set `passes: true`, clear `in_progress`:
 
 ```bash
-# Read current json, update the task, write back
 cat implementation_plan.json | jq '
-  map(if .id == "<task_id>" then .passes = true else . end)
+  map(if .id == "<task_id>" then .passes = true | .in_progress = false else . end)
 ' > /tmp/plan_update.json && mv /tmp/plan_update.json implementation_plan.json
 ```
 
 Announce:
 > Task <id> passed verification.
 
-**On stuck (2 failed fix attempts):** Do NOT mark as passed. Go to Stuck Task handling below.
+**On stuck (2 failed fix attempts):** Clear `in_progress`, do NOT mark as passed. Go to Stuck Task handling below.
+
+```bash
+cat implementation_plan.json | jq '
+  map(if .id == "<task_id>" then .in_progress = false else . end)
+' > /tmp/plan_update.json && mv /tmp/plan_update.json implementation_plan.json
+```
 
 ### 7. Code review gate (if configured)
 

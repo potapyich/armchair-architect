@@ -106,7 +106,8 @@ Schema:
     "dependsOn": [],
     "parallel": false,
     "group": "",
-    "passes": false
+    "passes": false,
+    "in_progress": false
   }
 ]
 ```
