@@ -328,8 +328,8 @@ Configurable via state.json.
 
 9. **Parallel subagents** — `parallel`/`group` in JSON schema + Agent tool in executor
 10. **Multi-pipeline support** — `.pipeline/<feature>/state.json`
-11. **Context handoff** — auto-detect ~40% context usage, write progress.md
-12. **Code review gate** — pause every N tasks in execute
+11. ✅ **Context handoff** — auto-detect ~40% context usage, write progress.md
+12. ✅ **Code review gate** — pause every N tasks in execute
 13. **Interview fast path** — accept document dump, skip to confirmation
 14. **Escalation execution → planning** — "this task revealed a plan-level problem"
 15. **Task dependencies in JSON schema** — explicit `dependsOn` field

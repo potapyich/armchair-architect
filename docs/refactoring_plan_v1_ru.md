@@ -332,8 +332,8 @@ Routing в `SKILL.md`: проверить наличие файла-артефа
 
 9. **Параллельные subagents** — `parallel`/`group` в JSON схеме + Agent tool в executor
 10. **Multi-pipeline support** — `.pipeline/<feature>/state.json`
-11. **Context handoff** — авто-детект ~40% контекста, запись progress.md
-12. **Code review gate** — pause каждые N тасков в execute
+11. ✅ **Context handoff** — авто-детект ~40% контекста, запись progress.md
+12. ✅ **Code review gate** — pause каждые N тасков в execute
 13. **Interview fast path** — принять дамп документов, пропустить к подтверждению
 14. **Escalation execution → planning** — "эта таска выявила проблему уровня плана"
 15. **Зависимости в JSON схеме** — явное поле `dependsOn`

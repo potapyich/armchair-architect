@@ -66,13 +66,36 @@ with open('.pipeline/state.json', 'w') as f: json.dump(s, f, indent=2)
 "
 ```
 
-### 4. Show summary and advance
+### 4. Configure code review gate
+
+Ask:
+> **Code review gate** — a subagent reviews recent code every N completed tasks.
+>
+> - **off** — no reviews *(default)*
+> - **3** — review every 3 tasks
+> - **5** — review every 5 tasks
+> - **10** — review every 10 tasks
+>
+> Choose [off / 3 / 5 / 10] or press Enter for off:
+
+Save choice to state (`0` for off, integer N otherwise):
+```bash
+python3 -c "
+import json
+with open('.pipeline/state.json') as f: s = json.load(f)
+s.setdefault('impl', {})['review_every'] = <chosen_int>
+with open('.pipeline/state.json', 'w') as f: json.dump(s, f, indent=2)
+"
+```
+
+### 5. Show summary and advance
 
 Tell the user:
 > Setup complete:
 > - context7: active / not installed
 > - critique: [chosen]
 > - TDD: on / off
+> - code review gate: every N tasks / off
 >
 > Run `/armchair-architect` to configure the interview.
 

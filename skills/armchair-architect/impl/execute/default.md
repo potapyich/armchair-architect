@@ -74,7 +74,48 @@ Announce:
 
 **On stuck (2 failed fix attempts):** Do NOT mark as passed. Go to Stuck Task handling below.
 
-### 6. Loop
+### 6. Code review gate (if configured)
+
+After marking a task passed, check if a review is due:
+
+```bash
+cat .pipeline/state.json | python3 -c "import json,sys; s=json.load(sys.stdin); print(s.get('impl',{}).get('review_every',0))"
+```
+
+If `review_every` is 0 or missing — skip. Otherwise, if `completed_count % review_every == 0`:
+
+Run:
+```bash
+git diff HEAD~<review_every> --stat
+git diff HEAD~<review_every>
+```
+
+Launch a subagent:
+```
+Agent(prompt="You are a senior engineer doing a code review.
+
+Recent changes (last <N> tasks):
+<git diff output>
+
+Tasks that produced these changes:
+<relevant task descriptions from implementation_plan.json>
+
+Review for: correctness, code quality, consistency with the plan,
+missing error handling, obvious bugs.
+Output: numbered list of issues with severity [high/medium/low]. No praise.
+If no issues: say 'No issues found.'")
+```
+
+Show findings to the user:
+> Code review after task <id> (<N> tasks completed):
+> [findings]
+>
+> Continue? [y / fix first]
+
+- If "y" or no issues: continue immediately.
+- If "fix first": pause, wait for user to address issues, then resume.
+
+### 7. Loop
 
 Increment completed task count. If count >= N (the user's chosen limit): go to Mid-run Stop.
 Otherwise go back to step 1 — pick the next `passes: false` task.
@@ -134,12 +175,34 @@ C) Stop — investigate manually, then run /armchair-architect to resume
 ## Context Budget Awareness
 
 After each completed task, check approximately how much context has been used.
-At ~40-50% estimated usage, warn the user:
+At ~40-50% estimated usage:
+
+1. Write `progress.md`:
+
+```bash
+python3 -c "
+import json
+with open('implementation_plan.json') as f: tasks = json.load(f)
+done = [t for t in tasks if t.get('passes')]
+remaining = [t for t in tasks if not t.get('passes')]
+lines = ['# Execution Progress', '']
+lines.append('## Completed')
+for t in done:
+    lines.append(f'- [{t[\"id\"]}] {t[\"description\"]}')
+lines.append('')
+lines.append('## Remaining')
+for t in remaining:
+    lines.append(f'- [{t[\"id\"]}] {t[\"description\"]}')
+open('progress.md', 'w').write('\n'.join(lines))
+"
+```
+
+2. Warn the user:
 
 > Approaching context limit after task <id>.
-> Completed so far: <N> tasks. Remaining: <M> tasks.
+> Wrote `progress.md` with execution state.
 >
-> Start a new session and run `/armchair-architect` — it will resume from the first `passes: false` task.
+> Start a new session and run `/armchair-architect` — it will resume from task <next_id>.
 
 ---
 
