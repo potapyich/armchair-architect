@@ -332,7 +332,7 @@ Configurable via state.json.
 11. ✅ **Context handoff** — auto-detect ~40% context usage, write progress.md
 12. ✅ **Code review gate** — pause every N tasks in execute
 13. **Interview fast path** — accept document dump, skip to confirmation
-14. **Escalation execution → planning** — "this task revealed a plan-level problem"
+14. ✅ **Escalation execution → planning** — "this task revealed a plan-level problem"
 15. ✅ **Task dependencies in JSON schema** — explicit `dependsOn` field
 16. ✅ **State validation** — basic schema check on load
 17. **Step idempotency** — handle mid-step restarts cleanly in execute

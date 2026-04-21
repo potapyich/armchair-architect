@@ -233,6 +233,7 @@ Options:
 A) Approve split — I'll update implementation_plan.json and continue
 B) Skip this task — mark as known issue, continue with next
 C) Stop — investigate manually, then run /armchair-architect to resume
+D) Escalate to plan — this task revealed a plan-level problem
 ```
 
 2. Wait for user choice. Do NOT modify `implementation_plan.json` until approved.
@@ -241,6 +242,43 @@ C) Stop — investigate manually, then run /armchair-architect to resume
    - Replace the stuck task entry with the subtask entries (all `passes: false`)
    - Write updated `implementation_plan.json`
    - Resume from the first subtask
+
+4. On escalation (D):
+   - Ask: "Describe the plan-level problem in one sentence."
+   - Wait for user's description.
+   - Write `escalation.md`:
+     ```
+     # Plan Escalation
+
+     **Triggered by:** task <id> — <description>
+     **Problem:** <user's description>
+     **Progress at escalation:** <N> tasks passed, <M> remaining
+
+     ## Passed tasks
+     <list of passed task ids and descriptions>
+
+     ## Remaining tasks
+     <list of remaining task ids and descriptions>
+     ```
+   - Ask: "Roll back to which step? [plan / impl_plan]"
+   - Update `.pipeline/state.json` — move the chosen step (and all steps after it) from `completed` back to `pending`, set `step` to the chosen value:
+     ```bash
+     python3 -c "
+     import json
+     with open('.pipeline/state.json') as f: s = json.load(f)
+     target = '<chosen_step>'
+     all_steps = ['init','setup','interview_setup','interview','plan','impl_plan','execute']
+     target_idx = all_steps.index(target)
+     to_rollback = [x for x in s.get('completed', []) if all_steps.index(x) >= target_idx]
+     s['completed'] = [x for x in s.get('completed', []) if x not in to_rollback]
+     s['pending'] = to_rollback + s.get('pending', [])
+     s['step'] = target
+     with open('.pipeline/state.json', 'w') as f: json.dump(s, f, indent=2)
+     "
+     ```
+   - Tell the user:
+     > Escalation recorded in `escalation.md`.
+     > Rolled back to **<step>**. Run `/armchair-architect` to continue from there.
 
 ---
 
