@@ -107,6 +107,59 @@ Confirm: "Switched <component> to <impl>."
 Do not proceed further.
 
 ### If arguments = "" or "run" (default — run or continue)
+
+First, validate state:
+
+```bash
+python3 -c "
+import json, sys
+VALID_STEPS = ['init','setup','interview_setup','interview','plan','impl_plan','execute','done']
+VALID_EXECUTE = ['default','ralph','tdd','worktree']
+VALID_CRITIQUE = ['none','default','strict']
+VALID_LANG = ['ru','en']
+try:
+    with open('.pipeline/state.json') as f: s = json.load(f)
+except FileNotFoundError:
+    sys.exit(0)
+except Exception as e:
+    print(f'STATE ERROR: cannot parse state.json: {e}'); sys.exit(1)
+errors = []
+step = s.get('step')
+if step not in VALID_STEPS:
+    errors.append(f'unknown step: {step!r}')
+pending = s.get('pending', [])
+completed = s.get('completed', [])
+if not isinstance(pending, list): errors.append('pending is not a list')
+if not isinstance(completed, list): errors.append('completed is not a list')
+if isinstance(pending, list) and isinstance(completed, list):
+    overlap = set(pending) & set(completed)
+    if overlap: errors.append(f'steps in both pending and completed: {sorted(overlap)}')
+    if step != 'done' and step not in pending:
+        errors.append(f'step {step!r} not in pending')
+lang = s.get('lang')
+if lang and lang not in VALID_LANG:
+    errors.append(f'unknown lang: {lang!r}')
+impl = s.get('impl', {})
+exe = impl.get('execute')
+if exe and exe not in VALID_EXECUTE:
+    errors.append(f'unknown impl.execute: {exe!r}')
+crit = impl.get('critique')
+if crit and crit not in VALID_CRITIQUE:
+    errors.append(f'unknown impl.critique: {crit!r}')
+if errors:
+    print('STATE ERROR: ' + '; '.join(errors)); sys.exit(1)
+" 2>&1
+```
+
+If the output contains `STATE ERROR:`, stop and tell the user:
+
+> Pipeline state appears corrupted:
+> `<error details>`
+>
+> Fix `.pipeline/state.json` manually, or run `/armchair-architect reset` to start over.
+
+Otherwise continue.
+
 Determine the current step from state. Load and execute the corresponding step file:
 
 | Step | File |
