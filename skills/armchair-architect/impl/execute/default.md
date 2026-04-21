@@ -22,21 +22,93 @@ Keep output short during execution — long responses get cut off mid-task:
 Before starting: note the task count N chosen by the user in step 07 (e.g. 3, 10, or "all").
 Track how many tasks you complete in this run. Stop after N tasks even if more remain.
 
-### 1. Load the task list
+### 1. Load the task list and find ready tasks
 
 ```bash
 cat implementation_plan.json
 ```
 
-Find the first task where `"passes": false`. That is the current task.
-If all tasks have `"passes": true` — execution is complete, go to Completion.
+Build the set of completed task ids (`passes: true`).
 
-### 2. Announce the task
+A task is **ready** if:
+- `passes: false`
+- all ids in its `dependsOn` array have `passes: true` (or `dependsOn` is empty/missing)
+
+If all tasks have `passes: true` — execution is complete, go to Completion.
+
+If no ready tasks remain but some have `passes: false` — dependency deadlock. Tell the user:
+> Dependency deadlock: remaining tasks cannot start because their dependencies have not passed.
+> Check `implementation_plan.json` for failed prerequisite tasks or dependency cycles.
+
+Stop.
+
+### 2. Dispatch: parallel or sequential
+
+From the ready tasks, check for parallel groups.
+
+**Sequential (default):** if no ready tasks have `parallel: true`, pick the first ready task
+and proceed to step 3 (Announce).
+
+**Parallel group:** if 2 or more ready tasks share the same `group` value and all have
+`parallel: true`:
+
+1. Collect all ready tasks in that group.
+2. For each task, launch a subagent in parallel:
+
+   ```
+   Agent(prompt="You are implementing a single task from a feature development plan.
+
+   Task id: <id>
+   Description: <description>
+   Context: <context>
+   Category: <category>
+
+   Implement this task. Then run each verification command:
+   <verification commands>
+
+   Write your result to file task_<id>_result.json:
+   {\"id\": \"<id>\", \"passes\": true, \"error\": \"\"}
+   or on failure:
+   {\"id\": \"<id>\", \"passes\": false, \"error\": \"<last error output>\"}
+
+   Rules:
+   - Make the smallest change that satisfies the task description
+   - Do not modify files outside the scope of this task
+   - Do not write passes: true unless ALL verification commands exit 0")
+   ```
+
+3. Wait for all subagents to complete.
+
+4. Merge results into `implementation_plan.json` and clean up temp files:
+
+   ```bash
+   python3 -c "
+   import json, glob, os
+   with open('implementation_plan.json') as f: tasks = json.load(f)
+   id_map = {t['id']: t for t in tasks}
+   for rf in sorted(glob.glob('task_*_result.json')):
+       with open(rf) as f: r = json.load(f)
+       if r['id'] in id_map:
+           id_map[r['id']]['passes'] = r['passes']
+       os.remove(rf)
+   with open('implementation_plan.json', 'w') as f: json.dump(list(id_map.values()), f, indent=2)
+   "
+   ```
+
+5. Report:
+   > Parallel group **<group>**: <N> tasks passed, <M> failed.
+   > Failed: <ids>  ← only if any
+
+6. If any failed → treat each as stuck (go to Stuck Task handling for each failed id).
+
+7. Increment `completed_count` by number of passed tasks. Go back to step 1.
+
+### 3. Announce the task
 
 Tell the user:
 > **Task <id>:** <description>
 
-### 3. Implement the task
+### 4. Implement the task
 
 Read relevant files, understand the context, write the code.
 
@@ -46,7 +118,7 @@ Guidelines:
 - Do not add features not in the task description
 - If the task depends on a previous task's output, verify that output exists first
 
-### 4. Run verification
+### 5. Run verification
 
 For each command in the task's `verification` array, run it with the Bash tool.
 
@@ -58,7 +130,7 @@ If a command fails:
 - Re-run the failed command
 - Allow up to **2 fix attempts** before declaring the task stuck
 
-### 5. Mark task result
+### 6. Mark task result
 
 **On pass:** Update `implementation_plan.json` — set `"passes": true` for this task id.
 
@@ -74,7 +146,7 @@ Announce:
 
 **On stuck (2 failed fix attempts):** Do NOT mark as passed. Go to Stuck Task handling below.
 
-### 6. Code review gate (if configured)
+### 7. Code review gate (if configured)
 
 After marking a task passed, check if a review is due:
 
@@ -115,10 +187,10 @@ Show findings to the user:
 - If "y" or no issues: continue immediately.
 - If "fix first": pause, wait for user to address issues, then resume.
 
-### 7. Loop
+### 8. Loop
 
 Increment completed task count. If count >= N (the user's chosen limit): go to Mid-run Stop.
-Otherwise go back to step 1 — pick the next `passes: false` task.
+Otherwise go back to step 1 — pick the next ready task.
 
 ---
 

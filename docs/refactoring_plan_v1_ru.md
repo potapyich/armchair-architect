@@ -330,13 +330,14 @@ Routing в `SKILL.md`: проверить наличие файла-артефа
 
 ### P3 — Сложные / отложенные
 
-9. **Параллельные subagents** — `parallel`/`group` в JSON схеме + Agent tool в executor
+9. ✅ **Параллельные subagents** — `parallel`/`group` в JSON схеме + Agent tool в executor
+9б. **Специализированные агенты** — при параллельном запуске выбирать промпт по `category` задачи (backend/frontend/database). Новый `impl/execute/specialized.md` поверх parallel executor. Не требует изменений в `steps/`.
 10. **Multi-pipeline support** — `.pipeline/<feature>/state.json`
 11. ✅ **Context handoff** — авто-детект ~40% контекста, запись progress.md
 12. ✅ **Code review gate** — pause каждые N тасков в execute
 13. **Interview fast path** — принять дамп документов, пропустить к подтверждению
 14. **Escalation execution → planning** — "эта таска выявила проблему уровня плана"
-15. **Зависимости в JSON схеме** — явное поле `dependsOn`
+15. ✅ **Зависимости в JSON схеме** — явное поле `dependsOn`
 16. ✅ **Валидация state** — базовая проверка схемы при загрузке
 17. **Идемпотентность шагов** — корректная обработка прерванных шагов в execute
 18. **Ralphex executor** — `impl/execute/ralphex.md`; ждём стабилизации API

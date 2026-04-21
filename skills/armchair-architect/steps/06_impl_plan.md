@@ -103,6 +103,9 @@ Schema:
       "npm test -- --grep 'unit test name'",
       "curl -s http://localhost:3000/endpoint | jq '.status'"
     ],
+    "dependsOn": [],
+    "parallel": false,
+    "group": "",
     "passes": false
   }
 ]
@@ -112,6 +115,17 @@ Schema:
 - Must be shell commands that exit 0 on success, non-0 on failure
 - Prefer running specific tests over `npm test` (faster feedback)
 - At minimum one verification command per task
+
+**dependsOn:** list of task ids this task cannot start before. Leave `[]` if none.
+Example: `"dependsOn": ["1.1", "1.2"]` — this task waits until 1.1 and 1.2 both pass.
+
+**parallel / group:** if multiple tasks can run simultaneously (no shared file writes,
+independent modules), set `parallel: true` and assign the same group name (e.g. `"api-layer"`,
+`"ui-components"`). Tasks in the same group with `parallel: true` will be launched concurrently.
+Leave `parallel: false` and `group: ""` for sequential tasks.
+
+Identify parallelizable tasks during JSON generation and mark them.
+The user reviews these markings at the approval gate.
 
 If TDD mode is active, also add a `tdd` block to each task:
 ```json
