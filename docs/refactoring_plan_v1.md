@@ -313,7 +313,7 @@ Configurable via state.json.
 
 4. ✅ **Centralized step registry** — remove hardcoded state JSON from each step file
 5. ✅ **Critic layer** — `impl/critique/`: two subagent critics (PRD + impl_plan)
-6. ⬜ **armchair-architect-lite** — for Copilot/Cursor
+6. ✅ **armchair-architect-lite** — for Copilot/Cursor
 7. ✅ **TDD gate executor** — `impl/execute/tdd.md` on top of ralph
 8. ✅ **Git worktrees executor** — `impl/execute/worktree.md`
 

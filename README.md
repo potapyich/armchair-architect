@@ -3,18 +3,43 @@
 A feature development pipeline for Claude Code. Takes a project from raw idea through
 structured PRD, planning, and automated execution.
 
-## Pipeline Overview
+Two variants:
+
+| | armchair-architect | armchair-architect-lite |
+|---|---|---|
+| State persistence | yes | — |
+| Resume after restart | yes | — |
+| Swappable executors | yes | — |
+| Critic subagents | yes | — |
+| Works without Claude Code | — | yes |
+| Works in Copilot / Cursor | — | yes |
+
+## armchair-architect — Full Pipeline
 
 ```
-/armchair-architect → PRD → Interview → plan.md → implementation_plan.md → implementation_plan.json → ralph
+/armchair-architect → PRD → Interview → plan.md → implementation_plan.md → implementation_plan.json → execute
 ```
 
 1. **Init** — describe your project, get a structured PRD
-2. **Interview** — targeted questions to fill gaps, deepen technical detail
-3. **Plan** — high-level work blocks, user-approved
-4. **Implementation Plan** — concrete steps per block, user-approved
-5. **Tasks** — execution-ready JSON with verification commands
-6. **Execute** — ralph runs the tasks autonomously
+2. **Setup** — configure context7, critique mode, TDD mode
+3. **Interview** — targeted questions to fill gaps, deepen technical detail
+4. **Plan** — high-level work blocks, user-approved
+5. **Implementation Plan** — concrete steps per block + execution JSON, user-approved
+6. **Execute** — run tasks autonomously (default executor or ralph)
+
+## armchair-architect-lite — Single Session
+
+```
+/armchair-architect-lite → PRD → Interview → Plan → Implementation Plan → Execute
+```
+
+Same phases as the full pipeline, in a single prompt file. No state machine, no external
+dependencies. Works in Claude Code, GitHub Copilot, Cursor, or any LLM chat.
+
+Use when:
+- You want zero setup — just invoke and go
+- You're in Copilot or Cursor and can't install the full plugin
+- The project is small enough to complete in one session
 
 ## Install
 
@@ -44,6 +69,11 @@ Add to `.claude/settings.json` in your project:
 }
 ```
 
+### GitHub Copilot / Cursor (lite only)
+
+Copy `skills/armchair-architect-lite/SKILL.md` into your repo as a custom instruction or
+agent instruction file for your editor.
+
 ### Update
 
 ```bash
@@ -56,7 +86,17 @@ cd ~/.claude/plugins/doit-cc-plugin && git pull
 /armchair-architect              # start or continue from current step
 /armchair-architect status       # show current state
 /armchair-architect reset        # clear state and start over
-/armchair-architect use execute ralphex   # switch executor
+/armchair-architect back         # return to previous step
+/armchair-architect skip interview   # skip to planning (requires prd.md)
+/armchair-architect skip planning    # skip to impl plan (requires plan.md)
+/armchair-architect list         # show available impl variants
+/armchair-architect use execute ralph    # switch to ralph executor
+/armchair-architect use execute tdd     # switch to TDD executor
+/armchair-architect use execute worktree  # switch to git worktree executor
+/armchair-architect use critique default  # enable critic subagents
+/armchair-architect use critique strict   # enable strict critic (security/perf angle)
+
+/armchair-architect-lite         # single-session version, no state
 ```
 
 ## Requirements

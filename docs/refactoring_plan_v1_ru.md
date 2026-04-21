@@ -317,7 +317,7 @@ Routing в `SKILL.md`: проверить наличие файла-артефа
 
 4. ✅ **Централизованный реестр шагов** — убрать хардкод state JSON из каждого step файла
 5. ✅ **Critic layer** — `impl/critique/`: два subagent-критика (PRD + impl_plan)
-6. ⬜ **armchair-architect-lite** — для Copilot/Cursor
+6. ✅ **armchair-architect-lite** — для Copilot/Cursor
 7. ✅ **TDD gate executor** — `impl/execute/tdd.md` поверх ralph
 8. ✅ **Git worktrees executor** — `impl/execute/worktree.md`
 
