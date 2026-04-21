@@ -186,7 +186,7 @@ cat implementation_plan.json | jq '
 After marking a task passed, check if a review is due:
 
 ```bash
-cat .pipeline/state.json | python3 -c "import json,sys; s=json.load(sys.stdin); print(s.get('impl',{}).get('review_every',0))"
+python3 -c "import json,os; a=open('.pipeline/active').read().strip() if os.path.exists('.pipeline/active') else 'default'; s=json.load(open(f'.pipeline/{a}/state.json')); print(s.get('impl',{}).get('review_every',0))"
 ```
 
 If `review_every` is 0 or missing — skip. Otherwise, if `completed_count % review_every == 0`:
@@ -300,7 +300,8 @@ D) Escalate to plan — this task revealed a plan-level problem
      ```bash
      python3 -c "
      import json
-     with open('.pipeline/state.json') as f: s = json.load(f)
+     import os as _os; _active = open('.pipeline/active').read().strip() if _os.path.exists('.pipeline/active') else 'default'; _sp = f'.pipeline/{_active}/state.json'
+with open(_sp) as f: s = json.load(f)
      target = '<chosen_step>'
      all_steps = ['init','setup','interview_setup','interview','plan','impl_plan','execute']
      target_idx = all_steps.index(target)
@@ -308,7 +309,7 @@ D) Escalate to plan — this task revealed a plan-level problem
      s['completed'] = [x for x in s.get('completed', []) if x not in to_rollback]
      s['pending'] = to_rollback + s.get('pending', [])
      s['step'] = target
-     with open('.pipeline/state.json', 'w') as f: json.dump(s, f, indent=2)
+     with open(_sp, 'w') as f: json.dump(s, f, indent=2)
      "
      ```
    - Tell the user:

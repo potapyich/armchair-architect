@@ -42,9 +42,10 @@ Save choice to state:
 ```bash
 python3 -c "
 import json
-with open('.pipeline/state.json') as f: s = json.load(f)
+import os as _os; _active = open('.pipeline/active').read().strip() if _os.path.exists('.pipeline/active') else 'default'; _sp = f'.pipeline/{_active}/state.json'
+with open(_sp) as f: s = json.load(f)
 s.setdefault('impl', {})['critique'] = '<chosen>'
-with open('.pipeline/state.json', 'w') as f: json.dump(s, f, indent=2)
+with open(_sp, 'w') as f: json.dump(s, f, indent=2)
 "
 ```
 
@@ -60,9 +61,10 @@ If yes: save to state:
 ```bash
 python3 -c "
 import json
-with open('.pipeline/state.json') as f: s = json.load(f)
+import os as _os; _active = open('.pipeline/active').read().strip() if _os.path.exists('.pipeline/active') else 'default'; _sp = f'.pipeline/{_active}/state.json'
+with open(_sp) as f: s = json.load(f)
 s.setdefault('impl', {})['execute'] = 'tdd'
-with open('.pipeline/state.json', 'w') as f: json.dump(s, f, indent=2)
+with open(_sp, 'w') as f: json.dump(s, f, indent=2)
 "
 ```
 
@@ -82,9 +84,10 @@ Save choice to state (`0` for off, integer N otherwise):
 ```bash
 python3 -c "
 import json
-with open('.pipeline/state.json') as f: s = json.load(f)
+import os as _os; _active = open('.pipeline/active').read().strip() if _os.path.exists('.pipeline/active') else 'default'; _sp = f'.pipeline/{_active}/state.json'
+with open(_sp) as f: s = json.load(f)
 s.setdefault('impl', {})['review_every'] = <chosen_int>
-with open('.pipeline/state.json', 'w') as f: json.dump(s, f, indent=2)
+with open(_sp, 'w') as f: json.dump(s, f, indent=2)
 "
 ```
 
@@ -104,11 +107,12 @@ Advance pipeline state:
 ```bash
 python3 -c "
 import json
-with open('.pipeline/state.json') as f: s = json.load(f)
+import os as _os; _active = open('.pipeline/active').read().strip() if _os.path.exists('.pipeline/active') else 'default'; _sp = f'.pipeline/{_active}/state.json'
+with open(_sp) as f: s = json.load(f)
 cur = s['step']
 s['completed'] = s.get('completed', []) + [cur]
 s['pending'] = [x for x in s.get('pending', []) if x != cur]
 s['step'] = s['pending'][0] if s['pending'] else 'done'
-with open('.pipeline/state.json', 'w') as f: json.dump(s, f, indent=2)
+with open(_sp, 'w') as f: json.dump(s, f, indent=2)
 "
 ```

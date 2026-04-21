@@ -36,7 +36,8 @@ Advance pipeline state and record interview configuration:
 ```bash
 python3 -c "
 import json
-with open('.pipeline/state.json') as f: s = json.load(f)
+import os as _os; _active = open('.pipeline/active').read().strip() if _os.path.exists('.pipeline/active') else 'default'; _sp = f'.pipeline/{_active}/state.json'
+with open(_sp) as f: s = json.load(f)
 cur = s['step']
 s['completed'] = s.get('completed', []) + [cur]
 s['pending'] = [x for x in s.get('pending', []) if x != cur]
@@ -44,7 +45,7 @@ s['step'] = s['pending'][0] if s['pending'] else 'done'
 s['interview_mode'] = '<chunked_5 or continuous>'
 s['interview_limit'] = None  # or a number
 s['interview_questions_asked'] = 0
-with open('.pipeline/state.json', 'w') as f: json.dump(s, f, indent=2)
+with open(_sp, 'w') as f: json.dump(s, f, indent=2)
 "
 ```
 

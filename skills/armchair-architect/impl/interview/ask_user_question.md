@@ -20,7 +20,7 @@ Bad (too many at once):
 ## Tracking
 
 After each answer:
-- Increment `interview_questions_asked` in `.pipeline/state.json`
+- Increment `interview_questions_asked` in the active pipeline state file
 - Note the answer internally for use in the PRD update
 
 ## When to Ask Follow-ups
