@@ -1,4 +1,4 @@
-# doit-cc-plugin
+# armchair-architect
 
 A feature development pipeline for Claude Code. Takes a project from raw idea through
 structured PRD, planning, and automated execution.
@@ -11,6 +11,7 @@ Two variants:
 | Resume after restart | yes | — |
 | Swappable executors | yes | — |
 | Critic subagents | yes | — |
+| Multi-pipeline support | yes | — |
 | Works without Claude Code | — | yes |
 | Works in Copilot / Cursor | — | yes |
 
@@ -21,7 +22,7 @@ Two variants:
 ```
 
 1. **Init** — describe your project, get a structured PRD
-2. **Setup** — configure context7, critique mode, TDD mode
+2. **Setup** — configure context7, critique mode, TDD mode, code review gate
 3. **Interview** — targeted questions to fill gaps, deepen technical detail
 4. **Plan** — high-level work blocks, user-approved
 5. **Implementation Plan** — concrete steps per block + execution JSON, user-approved
@@ -46,26 +47,26 @@ Use when:
 ### Global (all projects)
 
 ```bash
-git clone https://github.com/potapyich/doit-cc-plugin ~/.claude/plugins/doit-cc-plugin
+git clone https://github.com/potapyich/armchair-architect ~/.claude/plugins/armchair-architect
 ```
 
 Add to `~/.claude/settings.json`:
 ```json
 {
-  "plugins": ["~/.claude/plugins/doit-cc-plugin"]
+  "plugins": ["~/.claude/plugins/armchair-architect"]
 }
 ```
 
 ### Per-project
 
 ```bash
-git clone https://github.com/potapyich/doit-cc-plugin .claude/plugins/doit-cc-plugin
+git clone https://github.com/potapyich/armchair-architect .claude/plugins/armchair-architect
 ```
 
 Add to `.claude/settings.json` in your project:
 ```json
 {
-  "plugins": [".claude/plugins/doit-cc-plugin"]
+  "plugins": [".claude/plugins/armchair-architect"]
 }
 ```
 
@@ -77,24 +78,31 @@ agent instruction file for your editor.
 ### Update
 
 ```bash
-cd ~/.claude/plugins/doit-cc-plugin && git pull
+cd ~/.claude/plugins/armchair-architect && git pull
 ```
 
 ## Usage
 
 ```bash
 /armchair-architect              # start or continue from current step
-/armchair-architect status       # show current state
-/armchair-architect reset        # clear state and start over
+/armchair-architect status       # show current pipeline state
+/armchair-architect reset        # clear active pipeline state and start over
 /armchair-architect back         # return to previous step
 /armchair-architect skip interview   # skip to planning (requires prd.md)
 /armchair-architect skip planning    # skip to impl plan (requires plan.md)
 /armchair-architect list         # show available impl variants
-/armchair-architect use execute ralph    # switch to ralph executor
-/armchair-architect use execute tdd     # switch to TDD executor
-/armchair-architect use execute worktree  # switch to git worktree executor
-/armchair-architect use critique default  # enable critic subagents
-/armchair-architect use critique strict   # enable strict critic (security/perf angle)
+
+# Multi-pipeline
+/armchair-architect pipelines        # list all pipelines with current step
+/armchair-architect new <feature>    # create and switch to a new pipeline
+/armchair-architect switch <feature> # switch active pipeline
+
+# Swap executors and modes
+/armchair-architect use execute ralph       # switch to ralph executor
+/armchair-architect use execute tdd         # switch to TDD executor (requires ralph)
+/armchair-architect use execute worktree    # switch to git worktree executor
+/armchair-architect use critique default    # enable critic subagents
+/armchair-architect use critique strict     # enable strict critic (security/perf angle)
 
 /armchair-architect-lite         # single-session version, no state
 ```
@@ -102,7 +110,7 @@ cd ~/.claude/plugins/doit-cc-plugin && git pull
 ## Requirements
 
 - [Claude Code](https://claude.ai/code)
-- [ralph](https://github.com/anthropics/ralph) for execution phase
+- [ralph-loop](https://github.com/anthropics/ralph) *(optional — for ralph/TDD/worktree executors)*
 
 ## Files Created in Your Project
 
@@ -115,8 +123,10 @@ cd ~/.claude/plugins/doit-cc-plugin && git pull
 | `implementation_plan.md` | Step 5 | Detailed steps (English canonical) |
 | `implementation_plan_ru.md` | Step 5 (if lang=ru) | Detailed steps in Russian |
 | `implementation_plan.json` | Step 5 | Execution tasks (generated after approval) |
-| `progress.md` | Step 6 | Execution log (written by ralph) |
-| `.pipeline/state.json` | Throughout | Pipeline state (gitignored) |
+| `progress.md` | Step 6 | Execution progress — written on context handoff |
+| `escalation.md` | Step 6 | Written when a task reveals a plan-level problem |
+| `.pipeline/active` | Throughout | Name of the active pipeline |
+| `.pipeline/<feature>/state.json` | Throughout | Pipeline state (gitignored) |
 
 ## Design
 
