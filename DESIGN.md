@@ -144,8 +144,8 @@ SKILL.md orchestrator (reads .pipeline/active → state.json, selects step)
 │  Level 2: HOW (impl/)            │
 │  swappable implementation        │
 │  interview/: ask_user_question   │
-│  execute/:   default, ralph,     │
-│              tdd, worktree       │
+│  execute/:   specialized, default,│
+│              ralph, tdd, worktree│
 │  critique/:  none, default,      │
 │              strict              │
 └──────────────────────────────────┘
@@ -165,7 +165,7 @@ SKILL.md orchestrator (reads .pipeline/active → state.json, selects step)
   "pending": ["interview", "plan", "impl_plan", "execute"],
   "impl": {
     "interview": "ask_user_question",
-    "execute": "default",
+    "execute": "specialized",
     "critique": "none",
     "review_every": 0
   }
@@ -232,6 +232,8 @@ moves it to `.pipeline/default/state.json` on first run.
 | TDD requires ralph | Default executor unsuitable (context polluted by planning history) | Ralph runs each task in fresh session |
 | Parallel results via temp files | Subagents write `task_<id>_result.json`, main executor merges | Avoids concurrent writes to `implementation_plan.json` |
 | Ralph invocation | Manual: tell user to run `/ralph-loop` | Claude Code has no skill-to-skill API |
+| Specialized executor as default | `specialized` replaces `default` as default executor | Parallel task scope discipline at no cost for sequential tasks; `specialized.md` is a thin extension of `default.md`, not a fork |
+| Specialization parallel-only | Role persona added only in Agent dispatch, not sequential tasks | Main LLM has full planning context — adding a role persona risks refusing cross-cutting changes |
 
 ---
 
@@ -258,4 +260,3 @@ Update: `git pull` in plugin directory.
 
 - Skill-to-skill invocation — would enable direct ralph integration without manual handoff
 - Ralphex executor — waiting for API stabilization
-- Specialized agents — pick subagent prompt by `category` (backend/frontend) for parallel tasks

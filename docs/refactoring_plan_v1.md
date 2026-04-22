@@ -94,9 +94,12 @@ ADRs, or a full technical spec upfront and skip interview.
 
 ### 8. `implementation_plan.json` is a flat list
 
-No explicit dependencies between tasks (only implicit ordering). If task 3.1 depends on
+> **Status: resolved.** `dependsOn` field added to task schema. Executor resolves
+> readiness before each dispatch. Parallel groups use `parallel`/`group` fields.
+
+~~No explicit dependencies between tasks (only implicit ordering). If task 3.1 depends on
 2.3, it's not expressed anywhere. Sequential execution works, but no support for
-reordering or parallelization if needed.
+reordering or parallelization if needed.~~
 
 ### 9. Ralph integration is manual handoff
 
@@ -108,15 +111,21 @@ friction: user must manually switch between two skills.
 
 ### 10. Steps are not idempotent
 
-If pipeline interrupted mid-step (network error, context overflow), re-running
+> **Status: resolved (execute).** Executor sets `in_progress: true` before writing code.
+> On restart, detects interrupted task and offers to verify or re-implement.
+
+~~If pipeline interrupted mid-step (network error, context overflow), re-running
 `/armchair-architect` restarts the step from scratch. For init/interview this is tolerable.
-For execute — partial code changes + restart may create conflicts.
+For execute — partial code changes + restart may create conflicts.~~
 
 ### 11. Bilingual artifacts drift between phases
 
-`prd_ru.md`, `plan_ru.md`, `implementation_plan_ru.md` — now primary documents for Russian
+> **Status: resolved.** Russian artifacts are now primary for `lang=ru` users; English
+> versions are derived at phase boundaries. Drift eliminated by construction.
+
+~~`prd_ru.md`, `plan_ru.md`, `implementation_plan_ru.md` — now primary documents for Russian
 users. English versions (`prd.md` etc.) are derived from confirmed Russian, not the other
-way around. English users get no Russian versions.
+way around. English users get no Russian versions.~~
 
 ---
 
@@ -272,6 +281,37 @@ Implemented in `impl/execute/` without touching `steps/`.
 
 ---
 
+### Specialized agents (9б)
+
+New default executor `impl/execute/specialized.md` — thin extension of `default.md`.
+
+When parallel tasks are dispatched, each subagent receives a role context based on
+the task's `category` field:
+
+| category | role |
+|---|---|
+| `backend` | Backend engineer — server logic, API contracts, error handling |
+| `frontend` | Frontend engineer — UI, accessibility, client state |
+| `database` | Database engineer — schema, migrations, indexes, data integrity |
+| `infra` | DevOps engineer — CI/CD, Docker, deployment config |
+| `test` | QA engineer — coverage, edge cases, test isolation |
+| `config` | Configuration engineer — env vars, build settings |
+
+Roles are **advisory**, not prohibitive: agents focus on their domain but make
+cross-cutting changes if the task requires it.
+
+**Specialization applies only to parallel dispatch.** Sequential tasks run in the main
+LLM with full planning context — no role persona added, to avoid restricting
+cross-cutting changes.
+
+`specialized.md` is a thin extension (not a fork) of `default.md`: one override in
+parallel dispatch, all other logic inherited. No maintenance divergence.
+
+`specialized` is now the default executor. `default` remains available for comparison
+or rollback via `/armchair-architect use execute default`.
+
+---
+
 ### armchair-architect-lite
 
 New skill `skills/armchair-architect-lite/SKILL.md` — single file, no state machine.
@@ -327,7 +367,7 @@ Configurable via state.json.
 ### P3 — Complex / deferred
 
 9. ✅ **Parallel subagents** — `parallel`/`group` in JSON schema + Agent tool in executor
-9b. **Specialized agents** — when launching parallel tasks, pick prompt by `category` (backend/frontend/database). New `impl/execute/specialized.md` on top of parallel executor. No changes to `steps/`.
+9b. ✅ **Specialized agents** — `impl/execute/specialized.md`: thin extension of default executor; parallel dispatch picks role context by `category` (backend/frontend/database/infra/test/config). Sequential tasks unchanged. Now the default executor.
 10. ✅ **Multi-pipeline support** — `.pipeline/<feature>/state.json`
 11. ✅ **Context handoff** — auto-detect ~40% context usage, write progress.md
 12. ✅ **Code review gate** — pause every N tasks in execute

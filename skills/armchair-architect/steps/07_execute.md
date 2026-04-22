@@ -8,9 +8,10 @@ Run the implementation plan using the configured executor.
 
 ### 1. Resolve executor
 
-Read `impl.execute` from state. Default: `default`.
+Read `impl.execute` from state. Default: `specialized`.
 
-- `default` — built-in executor: I implement tasks here in this session
+- `specialized` — built-in executor with role-aware subagents for parallel tasks
+- `default` — built-in executor, no role context
 - `ralph` — delegates to ralph-loop plugin running in a separate session
 
 Load the corresponding impl file: `${CLAUDE_SKILL_DIR}/impl/execute/<impl>.md`

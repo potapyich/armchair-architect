@@ -5,7 +5,7 @@ description: Feature development pipeline. Guides a project from idea through PR
 
 Current pipeline state:
 ```json
-!`ACTIVE=$(cat .pipeline/active 2>/dev/null || echo 'default'); cat .pipeline/$ACTIVE/state.json 2>/dev/null || echo '{"step":"init","completed":[],"pending":["init","setup","interview_setup","interview","plan","impl_plan","execute"],"impl":{"interview":"ask_user_question","execute":"default","critique":"none"}}'`
+!`ACTIVE=$(cat .pipeline/active 2>/dev/null || echo 'default'); cat .pipeline/$ACTIVE/state.json 2>/dev/null || echo '{"step":"init","completed":[],"pending":["init","setup","interview_setup","interview","plan","impl_plan","execute"],"impl":{"interview":"ask_user_question","execute":"specialized","critique":"none"}}'`
 ```
 
 Active pipeline: `!`cat .pipeline/active 2>/dev/null || echo 'default'``
@@ -245,7 +245,7 @@ Then validate state:
 python3 -c "
 import json, sys, os
 VALID_STEPS = ['init','setup','interview_setup','interview','plan','impl_plan','execute','done']
-VALID_EXECUTE = ['default','ralph','tdd','worktree']
+VALID_EXECUTE = ['default','ralph','tdd','worktree','specialized']
 VALID_CRITIQUE = ['none','default','strict']
 VALID_LANG = ['ru','en']
 active = open('.pipeline/active').read().strip() if os.path.exists('.pipeline/active') else 'default'
