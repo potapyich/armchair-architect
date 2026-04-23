@@ -1,0 +1,9 @@
+[
+  {"name": "init",            "file": "01_init.md",            "title": "Init & PRD Generation"},
+  {"name": "setup",           "file": "02_setup.md",           "title": "Setup"},
+  {"name": "interview_setup", "file": "03_interview_setup.md", "title": "Interview Setup"},
+  {"name": "interview",       "file": "04_interview.md",       "title": "Interview"},
+  {"name": "plan",            "file": "05_plan.md",            "title": "Strategy Plan"},
+  {"name": "impl_plan",       "file": "06_impl_plan.md",       "title": "Implementation Plan & Tasks"},
+  {"name": "execute",         "file": "07_execute.md",         "title": "Execute"}
+]

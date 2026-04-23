@@ -6,7 +6,7 @@ Gather the user's project description and generate a structured PRD.
 
 ## Instructions
 
-### 0. Check for existing PRD
+### 1. Check for existing PRD
 
 Try to read `prd.md` using the Read tool (or equivalent file access).
 
@@ -21,12 +21,12 @@ Wait for the user's choice (A or B).
 - If **A**: confirm it's loaded, update state to `interview_setup`, and stop this step.
 - If **B**: proceed with the full init flow below.
 
-### 1. Detect input language
+### 2. Detect input language
 
 Check what language the user has been writing in this session.
 Set `lang` in state accordingly: `"ru"` or `"en"`.
 
-### 2. Request project description
+### 3. Request project description
 
 If no project description has been given yet, ask the user:
 
@@ -35,20 +35,13 @@ If no project description has been given yet, ask the user:
 
 Wait for the user's response before proceeding.
 
-### 3. Check for existing CLAUDE.md
+### 4. Check for existing CLAUDE.md
 
 Use the Read tool to check if `CLAUDE.md` exists in the current project.
 - If found: read it and note the tech stack and architectural decisions.
 - If not found: note this; offer at the end of this step to create one or defer.
 
-### 4. Generate PRD
-
-**If input was in Russian:**
-1. Generate `_prd_ru.md` — structured PRD in Russian, based on the user's description.
-2. Generate `prd.md` — English translation/adaptation of `_prd_ru.md`.
-
-**If input was in English:**
-1. Generate `prd.md` directly.
+### 5. Generate PRD
 
 PRD structure:
 ```markdown
@@ -76,27 +69,47 @@ PRD structure:
 <unresolved items — will be addressed in interview>
 ```
 
-### 5. Present and confirm
+**If input was in Russian:**
+1. Generate `prd_ru.md` — structured PRD in Russian, based on the user's description.
+2. Present `prd_ru.md` to the user for review and corrections (step 6).
+3. After confirmation, generate `prd.md` — English canonical derived from the confirmed `prd_ru.md`.
 
-Show the generated PRD to the user. Ask:
+**If input was in English:**
+1. Generate `prd.md` directly. No Russian version.
+
+### 6. Run PRD critique (if enabled)
+
+Read `impl.critique` from state. Load `${CLAUDE_SKILL_DIR}/impl/critique/<critique>.md`
+and follow its **PRD Critique** section.
+
+If critique is `none`: skip silently.
+
+If findings are returned: save them to state as `critique_prd` (they feed into interview).
+
+### 7. Present and confirm
+
+**If lang = "ru":** show `prd_ru.md` to the user (and critic findings if any). Ask:
+> Всё верно? Поправки перед тем как перейдём к настройке интервью?
+
+Apply corrections to `prd_ru.md`, then regenerate `prd.md` from the confirmed Russian.
+
+**If lang = "en":** show `prd.md` (and critic findings if any). Ask:
 > Does this capture your project correctly? Any corrections before we move to interview setup?
 
 Apply any corrections, then proceed.
 
-### 6. Update state
+### 8. Update state
 
-```json
-{
-  "step": "interview_setup",
-  "lang": "<detected lang>",
-  "completed": ["init"],
-  "pending": ["interview_setup", "interview", "plan", "impl_plan", "tasks", "execute"]
-}
+Save the detected language, then advance pipeline state:
+
+```bash
+PYTHONPATH=${CLAUDE_SKILL_DIR}/lib python3 -m state set-lang <detected lang>
+PYTHONPATH=${CLAUDE_SKILL_DIR}/lib python3 -m state advance
 ```
 
-Write to `.pipeline/state.json`.
+Replace `<detected lang>` with `ru` or `en`.
 
-### 7. Offer CLAUDE.md creation (if missing)
+### 9. Offer CLAUDE.md creation (if missing)
 
 If `CLAUDE.md` was not found:
 > No CLAUDE.md found. Want me to create one now with the stack and context from your project

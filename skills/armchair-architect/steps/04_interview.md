@@ -1,4 +1,4 @@
-# Step 03 — Interview
+# Step 04 — Interview
 
 ## Goal
 
@@ -22,7 +22,10 @@ Do NOT ask about things already answered in `prd.md` or `CLAUDE.md`.
 
 ### Read current state
 
-Check `interview_mode` and `interview_questions_asked` from state.
+Check `interview_mode`, `interview_questions_asked`, and `critique_prd` from state.
+
+If `critique_prd` is a non-empty array: use those findings as the first questions of the
+interview (they are pre-identified gaps). Count them toward `interview_questions_asked`.
 
 ### Ask questions
 
@@ -71,16 +74,13 @@ Ask all questions, then give one final assessment at the end.
 When the interview is complete (user chose to finish or limit reached):
 
 1. Summarize key decisions made during the interview
-2. Update `prd.md` with all clarifications — add detail, resolve "Open Questions" section
-3. If `lang = "ru"`, regenerate `_prd_ru.md` from updated `prd.md`
-4. Update state:
+2. Update PRD with all clarifications — add detail, resolve "Open Questions" section:
+   - If `lang = "ru"`: update `prd_ru.md` first, then regenerate `prd.md` from it
+   - If `lang = "en"`: update `prd.md` only
+4. Update state — advance pipeline:
 
-```json
-{
-  "step": "plan",
-  "completed": ["init", "interview_setup", "interview"],
-  "pending": ["plan", "impl_plan", "tasks", "execute"]
-}
+```bash
+PYTHONPATH=${CLAUDE_SKILL_DIR}/lib python3 -m state advance
 ```
 
 5. Confirm:
