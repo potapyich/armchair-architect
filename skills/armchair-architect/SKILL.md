@@ -1,11 +1,11 @@
 ---
 name: armchair-architect
-description: Feature development pipeline. Guides a project from idea through PRD, planning, and automated execution. Usage: /armchair-architect [status|reset|back|skip <step>|use <component> <impl>|list|new <feature>|switch <feature>|pipelines]
+description: Feature development pipeline. Guides a project from idea through PRD, planning, and automated execution. Usage: /armchair-architect [status|reset|back|skip <step>|use <component> <impl>|list|new <feature>|switch <feature>|pipelines|stats]
 ---
 
 Current pipeline state:
 ```json
-!`ACTIVE=$(cat .pipeline/active 2>/dev/null || echo 'default'); cat .pipeline/$ACTIVE/state.json 2>/dev/null || echo '{"step":"init","completed":[],"pending":["init","setup","interview_setup","interview","plan","impl_plan","execute"],"impl":{"interview":"ask_user_question","execute":"specialized","critique":"none"}}'`
+!`ACTIVE=$(cat .pipeline/active 2>/dev/null || echo 'default'); cat .pipeline/$ACTIVE/state.json 2>/dev/null || echo '{"step":"init","completed":[],"pending":["init","setup","interview_setup","interview","plan","impl_plan","execute"],"impl":{"interview":"ask_user_question","execute":"default","critique":"none"}}'`
 ```
 
 Active pipeline: `!`cat .pipeline/active 2>/dev/null || echo 'default'``
@@ -13,6 +13,15 @@ Active pipeline: `!`cat .pipeline/active 2>/dev/null || echo 'default'``
 Skill directory: ${CLAUDE_SKILL_DIR}
 
 Arguments: "$ARGUMENTS"
+
+---
+
+All state mutations go through the helper library at `${CLAUDE_SKILL_DIR}/lib/state.py`.
+Invoke it with `PYTHONPATH=${CLAUDE_SKILL_DIR}/lib python3 -m state <command> [args]`.
+Available commands: `validate`, `advance`, `rollback-one`, `rollback-to <step>`,
+`skip-to-after <step>...`, `set-impl <component> <value>`, `set-lang <ru|en>`,
+`auto-migrate`, `list-pipelines`, `create-pipeline <name>`, `switch-pipeline <name>`,
+`reset-active`, `emit-event <name> [k=v ...]`, `step-file <step>`, `active-pipeline`, `load`.
 
 ---
 
@@ -25,8 +34,7 @@ Read the state above and the arguments, then act accordingly:
 Parse: `new <feature>`
 
 ```bash
-mkdir -p .pipeline/<feature>
-echo '<feature>' > .pipeline/active
+PYTHONPATH=${CLAUDE_SKILL_DIR}/lib python3 -m state create-pipeline <feature>
 ```
 
 Confirm:
@@ -38,18 +46,14 @@ Do not proceed further.
 
 Parse: `switch <feature>`
 
-Check `.pipeline/<feature>/state.json` exists:
 ```bash
-ls .pipeline/<feature>/state.json 2>/dev/null && echo "found" || echo "missing"
+PYTHONPATH=${CLAUDE_SKILL_DIR}/lib python3 -m state switch-pipeline <feature>
 ```
 
-If missing:
+If output is `missing`:
 > Pipeline **<feature>** not found. Use `/armchair-architect new <feature>` to create it.
 
-If found: write active file and confirm:
-```bash
-echo '<feature>' > .pipeline/active
-```
+If output is `ok`:
 > Switched to pipeline **<feature>** (step: <current step from its state>).
 
 Do not proceed further.
@@ -57,24 +61,10 @@ Do not proceed further.
 ### If arguments = "pipelines"
 
 ```bash
-python3 -c "
-import json, os
-active = open('.pipeline/active').read().strip() if os.path.exists('.pipeline/active') else 'default'
-if not os.path.exists('.pipeline'):
-    print('No pipelines found.')
-else:
-    found = False
-    for d in sorted(os.listdir('.pipeline')):
-        if d == 'active': continue
-        sp = f'.pipeline/{d}/state.json'
-        if os.path.exists(sp):
-            step = json.load(open(sp)).get('step', '?')
-            marker = '*' if d == active else ' '
-            print(f'{marker} {d}: {step}')
-            found = True
-    if not found: print('No pipelines found.')
-"
+PYTHONPATH=${CLAUDE_SKILL_DIR}/lib python3 -m state list-pipelines
 ```
+
+If empty output: "No pipelines found."
 
 Do not proceed further.
 
@@ -93,7 +83,7 @@ Do not proceed further.
 Ask the user to confirm: "Reset pipeline **<active>** state? All progress will be lost. [y/n]"
 If confirmed:
 ```bash
-rm -f .pipeline/$(cat .pipeline/active 2>/dev/null || echo 'default')/state.json
+PYTHONPATH=${CLAUDE_SKILL_DIR}/lib python3 -m state reset-active
 ```
 Confirm deletion.
 If declined: do nothing.
@@ -104,25 +94,16 @@ Do not proceed further.
 Return to the previous step without full reset.
 
 ```bash
-python3 -c "
-import json, os, sys
-active = open('.pipeline/active').read().strip() if os.path.exists('.pipeline/active') else 'default'
-sp = f'.pipeline/{active}/state.json'
-with open(sp) as f: s = json.load(f)
-if not s.get('completed'):
-    print('NOTHING_TO_ROLLBACK'); sys.exit(0)
-prev = s['completed'].pop()
-s['pending'] = [prev] + s.get('pending', [])
-s['step'] = prev
-with open(sp, 'w') as f: json.dump(s, f, indent=2)
-print(f'ROLLED_BACK_TO:{prev}')
-"
+PYTHONPATH=${CLAUDE_SKILL_DIR}/lib python3 -m state rollback-one
 ```
 
 If output is `NOTHING_TO_ROLLBACK`:
 > Nothing to roll back — pipeline hasn't started yet.
 
-Otherwise confirm (replace `<step>` with the value after `ROLLED_BACK_TO:`):
+Otherwise emit a `step_back` event and confirm (replace `<step>` with the printed value):
+```bash
+PYTHONPATH=${CLAUDE_SKILL_DIR}/lib python3 -m state emit-event step_back to=<step>
+```
 > Rolled back to **<step>**. Run `/armchair-architect` to re-run this step.
 
 Do not proceed further.
@@ -142,21 +123,8 @@ If missing:
 
 If found:
 ```bash
-python3 -c "
-import json, os
-active = open('.pipeline/active').read().strip() if os.path.exists('.pipeline/active') else 'default'
-sp = f'.pipeline/{active}/state.json'
-with open(sp) as f: s = json.load(f)
-skip = ['interview_setup', 'interview']
-for st in skip:
-    if st in s.get('pending', []):
-        s['pending'].remove(st)
-    if st not in s.get('completed', []):
-        s.setdefault('completed', []).append(st)
-s['step'] = s['pending'][0] if s['pending'] else 'done'
-with open(sp, 'w') as f: json.dump(s, f, indent=2)
-print(s['step'])
-"
+PYTHONPATH=${CLAUDE_SKILL_DIR}/lib python3 -m state skip-to-after interview_setup interview
+PYTHONPATH=${CLAUDE_SKILL_DIR}/lib python3 -m state emit-event step_skip steps=interview_setup,interview
 ```
 Confirm (replace `<next step>` with printed value):
 > Skipped interview. Pipeline continues from **<next step>**.
@@ -172,17 +140,8 @@ If missing:
 
 If found:
 ```bash
-python3 -c "
-import json, os
-active = open('.pipeline/active').read().strip() if os.path.exists('.pipeline/active') else 'default'
-sp = f'.pipeline/{active}/state.json'
-with open(sp) as f: s = json.load(f)
-if 'plan' in s.get('pending', []): s['pending'].remove('plan')
-if 'plan' not in s.get('completed', []): s.setdefault('completed', []).append('plan')
-s['step'] = s['pending'][0] if s['pending'] else 'done'
-with open(sp, 'w') as f: json.dump(s, f, indent=2)
-print(s['step'])
-"
+PYTHONPATH=${CLAUDE_SKILL_DIR}/lib python3 -m state skip-to-after plan
+PYTHONPATH=${CLAUDE_SKILL_DIR}/lib python3 -m state emit-event step_skip steps=plan
 ```
 Confirm (replace `<next step>` with printed value):
 > Skipped planning. Pipeline continues from **<next step>**.
@@ -207,20 +166,69 @@ Active: execute=<value>, interview=<value>, critique=<value>
 Do not proceed further.
 
 ### If arguments starts with "use "
-Parse: `use <component> <impl>` (e.g., `use execute ralphex`)
+Parse: `use <component> <impl>` (e.g., `use execute ralph`)
+
+If `<component>` is `execute` and `<impl>` is one of `tdd`, `worktree`, `ralph` — gate
+on ralph-loop being installed:
 
 ```bash
-python3 -c "
-import json, os
-active = open('.pipeline/active').read().strip() if os.path.exists('.pipeline/active') else 'default'
-sp = f'.pipeline/{active}/state.json'
-with open(sp) as f: s = json.load(f)
-s.setdefault('impl', {})['<component>'] = '<impl>'
-with open(sp, 'w') as f: json.dump(s, f, indent=2)
-"
+RALPH=missing
+for p in ~/.claude/plugins/ralph-loop/SKILL.md \
+         .claude/plugins/ralph-loop/SKILL.md \
+         ~/.claude/skills/ralph-loop/SKILL.md; do
+  [ -f "$p" ] && RALPH=installed && break
+done
+if [ "$RALPH" = "missing" ] && [ -f ~/.claude/settings.json ]; then
+  python3 -c "import json,sys; d=json.load(open('$HOME/.claude/settings.json')); sys.exit(0 if d.get('enabledPlugins',{}).get('ralph-loop') else 1)" 2>/dev/null && RALPH=installed
+fi
+echo "$RALPH"
+```
+
+If output is `missing`, refuse and do not modify state:
+> Cannot switch to **<impl>** — ralph-loop is not installed.
+> Install: `git clone https://github.com/anthropics/ralph ~/.claude/plugins/ralph-loop`
+> Then re-run `/armchair-architect use execute <impl>`.
+
+Otherwise (or for any other `<component>`/`<impl>` pair), update state and emit event:
+
+```bash
+PYTHONPATH=${CLAUDE_SKILL_DIR}/lib python3 -m state set-impl <component> <impl>
+PYTHONPATH=${CLAUDE_SKILL_DIR}/lib python3 -m state emit-event impl_change component=<component> to=<impl>
 ```
 
 Confirm: "Switched <component> to <impl>."
+
+Do not proceed further.
+
+### If arguments = "stats"
+
+Aggregate events from `.pipeline/<active>/events.jsonl`:
+
+```bash
+PYTHONPATH=${CLAUDE_SKILL_DIR}/lib python3 -c "
+import collections, state
+events = state.read_events()
+if not events:
+    print('No events recorded yet.')
+    raise SystemExit
+counts = collections.Counter(e['event'] for e in events)
+print('Event counts:')
+for ev, n in sorted(counts.items(), key=lambda x: -x[1]):
+    print(f'  {ev}: {n}')
+passes = [e for e in events if e['event'] == 'task_pass']
+stuck = [e for e in events if e['event'] == 'task_stuck']
+total_done = len(passes) + len(stuck)
+if total_done:
+    first_attempt = sum(1 for e in passes if int(e.get('attempts', 1)) == 1)
+    print(f'Tasks completed: {total_done} (passed={len(passes)}, stuck={len(stuck)})')
+    print(f'First-attempt pass rate: {100 * first_attempt // total_done}%')
+by_cat = collections.Counter(e.get('category', '?') for e in stuck)
+if by_cat:
+    print('Stuck by category:')
+    for cat, n in by_cat.most_common():
+        print(f'  {cat}: {n}')
+"
+```
 
 Do not proceed further.
 
@@ -229,62 +237,16 @@ Do not proceed further.
 First, auto-migrate legacy state if needed:
 
 ```bash
-python3 -c "
-import os, shutil
-if os.path.exists('.pipeline/state.json') and not os.path.exists('.pipeline/active'):
-    os.makedirs('.pipeline/default', exist_ok=True)
-    shutil.move('.pipeline/state.json', '.pipeline/default/state.json')
-    open('.pipeline/active', 'w').write('default')
-    print('Migrated existing pipeline to .pipeline/default/')
-"
+PYTHONPATH=${CLAUDE_SKILL_DIR}/lib python3 -m state auto-migrate
 ```
 
 Then validate state:
 
 ```bash
-python3 -c "
-import json, sys, os
-VALID_STEPS = ['init','setup','interview_setup','interview','plan','impl_plan','execute','done']
-VALID_EXECUTE = ['default','ralph','tdd','worktree','specialized']
-VALID_CRITIQUE = ['none','default','strict']
-VALID_LANG = ['ru','en']
-active = open('.pipeline/active').read().strip() if os.path.exists('.pipeline/active') else 'default'
-state_path = f'.pipeline/{active}/state.json'
-try:
-    with open(state_path) as f: s = json.load(f)
-except FileNotFoundError:
-    sys.exit(0)
-except Exception as e:
-    print(f'STATE ERROR: cannot parse state.json: {e}'); sys.exit(1)
-errors = []
-step = s.get('step')
-if step not in VALID_STEPS:
-    errors.append(f'unknown step: {step!r}')
-pending = s.get('pending', [])
-completed = s.get('completed', [])
-if not isinstance(pending, list): errors.append('pending is not a list')
-if not isinstance(completed, list): errors.append('completed is not a list')
-if isinstance(pending, list) and isinstance(completed, list):
-    overlap = set(pending) & set(completed)
-    if overlap: errors.append(f'steps in both pending and completed: {sorted(overlap)}')
-    if step != 'done' and step not in pending:
-        errors.append(f'step {step!r} not in pending')
-lang = s.get('lang')
-if lang and lang not in VALID_LANG:
-    errors.append(f'unknown lang: {lang!r}')
-impl = s.get('impl', {})
-exe = impl.get('execute')
-if exe and exe not in VALID_EXECUTE:
-    errors.append(f'unknown impl.execute: {exe!r}')
-crit = impl.get('critique')
-if crit and crit not in VALID_CRITIQUE:
-    errors.append(f'unknown impl.critique: {crit!r}')
-if errors:
-    print('STATE ERROR: ' + '; '.join(errors)); sys.exit(1)
-" 2>&1
+PYTHONPATH=${CLAUDE_SKILL_DIR}/lib python3 -m state validate
 ```
 
-If the output contains `STATE ERROR:`, stop and tell the user:
+If the output starts with `STATE ERROR:`, stop and tell the user:
 
 > Pipeline state appears corrupted:
 > `<error details>`
@@ -293,26 +255,16 @@ If the output contains `STATE ERROR:`, stop and tell the user:
 
 Otherwise continue.
 
-Determine the current step from state. Load and execute the corresponding step file:
+Resolve the step file from `${CLAUDE_SKILL_DIR}/lib/steps.json` (single source of truth
+for the step sequence — never hardcode step names or filenames here):
 
-| Step | File |
-|---|---|
-| init | `${CLAUDE_SKILL_DIR}/steps/01_init.md` |
-| setup | `${CLAUDE_SKILL_DIR}/steps/02_setup.md` |
-| interview_setup | `${CLAUDE_SKILL_DIR}/steps/03_interview_setup.md` |
-| interview | `${CLAUDE_SKILL_DIR}/steps/04_interview.md` |
-| plan | `${CLAUDE_SKILL_DIR}/steps/05_plan.md` |
-| impl_plan | `${CLAUDE_SKILL_DIR}/steps/06_impl_plan.md` |
-| execute | `${CLAUDE_SKILL_DIR}/steps/07_execute.md` |
-
-Read the step file using the Read tool, then follow its instructions exactly.
-
-After completing a step, update the active pipeline state:
-- Move the completed step from `pending` to `completed`
-- Set `step` to the next pending step
-
-If `.pipeline/<active>/` directory does not exist, create it first:
 ```bash
-ACTIVE=$(cat .pipeline/active 2>/dev/null || echo 'default')
-mkdir -p .pipeline/$ACTIVE
+STEP=$(PYTHONPATH=${CLAUDE_SKILL_DIR}/lib python3 -m state load | python3 -c "import json,sys; print(json.load(sys.stdin).get('step',''))")
+FILE=$(PYTHONPATH=${CLAUDE_SKILL_DIR}/lib python3 -m state step-file "$STEP")
+echo "${CLAUDE_SKILL_DIR}/steps/$FILE"
 ```
+
+Read the resolved step file using the Read tool, then follow its instructions exactly.
+
+After completing a step, the step file itself calls `python3 -m state advance` to move
+the completed step from `pending` to `completed` and set `step` to the next pending one.

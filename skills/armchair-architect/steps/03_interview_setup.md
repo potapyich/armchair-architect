@@ -1,4 +1,4 @@
-# Step 02 — Interview Setup
+# Step 03 — Interview Setup
 
 ## Goal
 
@@ -34,18 +34,14 @@ Wait for the user's response. Parse their preferences:
 Advance pipeline state and record interview configuration:
 
 ```bash
-python3 -c "
-import json
-import os as _os; _active = open('.pipeline/active').read().strip() if _os.path.exists('.pipeline/active') else 'default'; _sp = f'.pipeline/{_active}/state.json'
-with open(_sp) as f: s = json.load(f)
-cur = s['step']
-s['completed'] = s.get('completed', []) + [cur]
-s['pending'] = [x for x in s.get('pending', []) if x != cur]
-s['step'] = s['pending'][0] if s['pending'] else 'done'
+PYTHONPATH=${CLAUDE_SKILL_DIR}/lib python3 -c "
+import state
+s = state.load() or {}
 s['interview_mode'] = '<chunked_5 or continuous>'
 s['interview_limit'] = None  # or a number
 s['interview_questions_asked'] = 0
-with open(_sp, 'w') as f: json.dump(s, f, indent=2)
+state.save(s)
+state.advance()
 "
 ```
 
@@ -56,4 +52,4 @@ Replace the interview_mode and interview_limit values with the user's choices.
 Confirm:
 > Got it. Starting interview now.
 
-Then immediately begin Step 03 (interview) — load `${CLAUDE_SKILL_DIR}/steps/03_interview.md`.
+Then immediately begin the interview — load `${CLAUDE_SKILL_DIR}/steps/04_interview.md`.

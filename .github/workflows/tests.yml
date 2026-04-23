@@ -1,0 +1,19 @@
+name: tests
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  state-lib:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run state.py smoke tests
+        run: |
+          PYTHONPATH=skills/armchair-architect/lib \
+            python3 -m unittest discover -s skills/armchair-architect/tests -v

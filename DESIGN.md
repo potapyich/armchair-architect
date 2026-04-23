@@ -4,7 +4,8 @@
 
 A feature development pipeline plugin for Claude Code. Guides a project from raw idea through
 structured PRD → planning → automated execution. Built as markdown prompt files; all logic
-is interpreted by Claude Code at runtime with zero external dependencies.
+is interpreted by Claude Code at runtime. Zero third-party dependencies — the only code is
+a stdlib-only Python helper at `lib/state.py` for state mutations (no pip, no build).
 
 ---
 
@@ -78,7 +79,7 @@ The built-in executor (`impl/execute/default.md`):
 - Per-task: mark `in_progress: true` → implement → verify → mark `passes: true` / stuck
 - Stuck task options: split / skip / stop / **escalate to plan** (writes `escalation.md`, rolls back state)
 - Code review gate: every N tasks → subagent reviews `git diff HEAD~N`, user approves before continuing
-- Context handoff: at ~40-50% usage → write `progress.md`, suggest new session
+- Periodic progress snapshot: every 5 completed tasks → write `progress.md`, remind user a fresh session is available if responses feel truncated
 
 For ralph-loop (`impl/execute/ralph.md`):
 - Tell user to run `/ralph-loop` in a new session
@@ -144,7 +145,7 @@ SKILL.md orchestrator (reads .pipeline/active → state.json, selects step)
 │  Level 2: HOW (impl/)            │
 │  swappable implementation        │
 │  interview/: ask_user_question   │
-│  execute/:   specialized, default,│
+│  execute/:   default, basic,     │
 │              ralph, tdd, worktree│
 │  critique/:  none, default,      │
 │              strict              │
@@ -165,7 +166,7 @@ SKILL.md orchestrator (reads .pipeline/active → state.json, selects step)
   "pending": ["interview", "plan", "impl_plan", "execute"],
   "impl": {
     "interview": "ask_user_question",
-    "execute": "specialized",
+    "execute": "default",
     "critique": "none",
     "review_every": 0
   }
@@ -214,6 +215,49 @@ Shell injection reads active pipeline dynamically:
 Auto-migration: if `.pipeline/state.json` exists without `.pipeline/active`, pipeline automatically
 moves it to `.pipeline/default/state.json` on first run.
 
+### State Helper Library
+
+`lib/state.py` is a stdlib-only Python module that owns all state mutations. It is invoked
+from SKILL.md and step files as:
+
+```bash
+PYTHONPATH=${CLAUDE_SKILL_DIR}/lib python3 -m state <command> [args]
+```
+
+Commands cover the full state surface: `validate`, `advance`, `rollback-one`,
+`rollback-to <step>`, `skip-to-after <step>...`, `set-impl <component> <value>`,
+`set-lang <ru|en>`, `auto-migrate`, `list-pipelines`, `create-pipeline <name>`,
+`switch-pipeline <name>`, `reset-active`, `emit-event <name> [k=v ...]`,
+`step-file <step>`, `active-pipeline`, `load`.
+
+**Single source of truth for the step sequence:** `lib/steps.json`. Resolve step
+file names via `python3 -m state step-file <step>` rather than hardcoding.
+
+**Why introduce a library in a markdown-only project:** stdlib-only Python means no
+build, no pip, no third-party dependency — the same `python3` Claude already invokes
+inline. The library replaces ~15 inline snippets that had drifted apart (e.g., the
+`active = open('.pipeline/active') ... f'.pipeline/{active}/state.json'` pattern was
+copy-pasted with subtle variations). Centralizing made the schema, migrations, and
+event emission testable in one place. New code must use the library; do not write
+new inline `python3 -c "import json,os; ..."` blocks for state operations.
+
+### Events & Stats
+
+`emit-event <name> [k=v ...]` appends one JSON line per event to
+`.pipeline/<active>/events.jsonl`. Step files emit:
+- `step_back`, `step_skip`, `impl_change` (from SKILL.md)
+- `task_pass` (with `attempts`, `category`), `task_stuck` (with `category`),
+  `escalation` (from `impl/execute/default.md`)
+
+`/armchair-architect stats` aggregates these into:
+- Per-event counts
+- Tasks completed (passed vs stuck)
+- First-attempt pass rate
+- Stuck-by-category histogram
+
+This is the only signal we have for whether the pipeline actually works for a user
+across many runs. Don't add new state fields to track these — emit events instead.
+
 ---
 
 ## Closed Design Decisions
@@ -232,8 +276,11 @@ moves it to `.pipeline/default/state.json` on first run.
 | TDD requires ralph | Default executor unsuitable (context polluted by planning history) | Ralph runs each task in fresh session |
 | Parallel results via temp files | Subagents write `task_<id>_result.json`, main executor merges | Avoids concurrent writes to `implementation_plan.json` |
 | Ralph invocation | Manual: tell user to run `/ralph-loop` | Claude Code has no skill-to-skill API |
-| Specialized executor as default | `specialized` replaces `default` as default executor | Parallel task scope discipline at no cost for sequential tasks; `specialized.md` is a thin extension of `default.md`, not a fork |
+| Specialized executor as default | Renamed to `default.md`; the bare-bones executor is now `basic.md` | Parallel task scope discipline at no cost for sequential tasks; `default.md` is a thin extension of `basic.md`, not a fork. `specialized` value in old state.json is auto-migrated to `default` on load |
 | Specialization parallel-only | Role persona added only in Agent dispatch, not sequential tasks | Main LLM has full planning context — adding a role persona risks refusing cross-cutting changes |
+| Stdlib-only Python helper (`lib/state.py`) | Allowed exception to "no toolchain" rule | ~15 inline state snippets had drifted apart with subtle bugs; centralizing in stdlib-only Python adds zero install cost and makes state ops testable |
+| Step sequence in `lib/steps.json` | Single source of truth | Previously each step file and SKILL.md hardcoded its own ordered list; renames silently broke routing |
+| Events as `events.jsonl`, not state fields | Append-only log per pipeline | State should be small and rewritten atomically; event history is unbounded and only read by `stats` |
 
 ---
 

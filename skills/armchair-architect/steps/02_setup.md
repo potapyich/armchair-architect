@@ -40,32 +40,40 @@ Ask:
 
 Save choice to state:
 ```bash
-python3 -c "
-import json
-import os as _os; _active = open('.pipeline/active').read().strip() if _os.path.exists('.pipeline/active') else 'default'; _sp = f'.pipeline/{_active}/state.json'
-with open(_sp) as f: s = json.load(f)
-s.setdefault('impl', {})['critique'] = '<chosen>'
-with open(_sp, 'w') as f: json.dump(s, f, indent=2)
-"
+PYTHONPATH=${CLAUDE_SKILL_DIR}/lib python3 -m state set-impl critique <chosen>
 ```
 
 ### 3. Configure TDD mode
 
-Ask:
+First detect whether ralph-loop is installed (TDD requires it):
+
+```bash
+RALPH=missing
+for p in ~/.claude/plugins/ralph-loop/SKILL.md \
+         .claude/plugins/ralph-loop/SKILL.md \
+         ~/.claude/skills/ralph-loop/SKILL.md; do
+  [ -f "$p" ] && RALPH=installed && break
+done
+if [ "$RALPH" = "missing" ] && [ -f ~/.claude/settings.json ]; then
+  python3 -c "import json,sys; d=json.load(open('$HOME/.claude/settings.json')); sys.exit(0 if d.get('enabledPlugins',{}).get('ralph-loop') else 1)" 2>/dev/null && RALPH=installed
+fi
+echo "$RALPH"
+```
+
+**If `RALPH=missing`:** tell the user, save default executor, skip the question:
+> **TDD mode** requires ralph-loop, which is not installed.
+> Skipping. To enable later: install ralph-loop, then run
+> `/armchair-architect use execute tdd`. Continuing with the default executor.
+
+**If `RALPH=installed`:** ask:
 > **TDD mode** — each task follows: write failing tests → implement → verify green.
-> Requires ralph-loop. Increases execution time, adds test coverage.
+> Increases execution time, adds test coverage.
 >
 > Enable TDD? [y/n] *(default: n)*
 
 If yes: save to state:
 ```bash
-python3 -c "
-import json
-import os as _os; _active = open('.pipeline/active').read().strip() if _os.path.exists('.pipeline/active') else 'default'; _sp = f'.pipeline/{_active}/state.json'
-with open(_sp) as f: s = json.load(f)
-s.setdefault('impl', {})['execute'] = 'tdd'
-with open(_sp, 'w') as f: json.dump(s, f, indent=2)
-"
+PYTHONPATH=${CLAUDE_SKILL_DIR}/lib python3 -m state set-impl execute tdd
 ```
 
 ### 4. Configure code review gate
@@ -82,13 +90,7 @@ Ask:
 
 Save choice to state (`0` for off, integer N otherwise):
 ```bash
-python3 -c "
-import json
-import os as _os; _active = open('.pipeline/active').read().strip() if _os.path.exists('.pipeline/active') else 'default'; _sp = f'.pipeline/{_active}/state.json'
-with open(_sp) as f: s = json.load(f)
-s.setdefault('impl', {})['review_every'] = <chosen_int>
-with open(_sp, 'w') as f: json.dump(s, f, indent=2)
-"
+PYTHONPATH=${CLAUDE_SKILL_DIR}/lib python3 -m state set-impl review_every <chosen_int>
 ```
 
 ### 5. Show summary and advance
@@ -105,14 +107,5 @@ Tell the user:
 Advance pipeline state:
 
 ```bash
-python3 -c "
-import json
-import os as _os; _active = open('.pipeline/active').read().strip() if _os.path.exists('.pipeline/active') else 'default'; _sp = f'.pipeline/{_active}/state.json'
-with open(_sp) as f: s = json.load(f)
-cur = s['step']
-s['completed'] = s.get('completed', []) + [cur]
-s['pending'] = [x for x in s.get('pending', []) if x != cur]
-s['step'] = s['pending'][0] if s['pending'] else 'done'
-with open(_sp, 'w') as f: json.dump(s, f, indent=2)
-"
+PYTHONPATH=${CLAUDE_SKILL_DIR}/lib python3 -m state advance
 ```

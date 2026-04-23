@@ -8,11 +8,12 @@ Run the implementation plan using the configured executor.
 
 ### 1. Resolve executor
 
-Read `impl.execute` from state. Default: `specialized`.
+Read `impl.execute` from state. Default: `default`.
 
-- `specialized` — built-in executor with role-aware subagents for parallel tasks
-- `default` — built-in executor, no role context
+- `default` — built-in executor with role-aware subagents for parallel tasks (recommended)
+- `basic` — built-in executor, no role context
 - `ralph` — delegates to ralph-loop plugin running in a separate session
+- `tdd` / `worktree` — variants on top of ralph (see `impl/execute/<name>.md`)
 
 Load the corresponding impl file: `${CLAUDE_SKILL_DIR}/impl/execute/<impl>.md`
 
@@ -55,12 +56,14 @@ Wait for user's reply, then follow the impl file instructions with the chosen ta
 
 ### 5. Context handoff reminder
 
-If you notice you're approaching context limits (~40-50%), warn the user:
+Context usage is not directly observable from inside Claude. Instead of guessing a
+percentage, treat this as a soft cap: after every 5 completed tasks, write `progress.md`
+and remind the user they can start a new session if responses start feeling truncated.
 
-> Approaching context limit. Before starting a new session:
-> 1. `implementation_plan.json` has task status (`passes: true/false`)
-> 2. In the new session, run `/armchair-architect` — it will resume from `execute` step
-> 3. Execution will continue from the first `passes: false` task.
+> Snapshot written. To start fresh:
+> 1. `implementation_plan.json` already tracks `passes: true/false` per task
+> 2. In a new session, run `/armchair-architect` — it resumes the `execute` step
+> 3. Execution continues from the first `passes: false` task.
 
 ### 6. On task failure or stuck task
 
@@ -87,11 +90,8 @@ When all tasks have `passes: true`:
 >
 > Run `git log --oneline` to review commits, or check `progress.md` for full execution log.
 
-Update state:
-```json
-{
-  "step": "done",
-  "completed": ["init", "interview_setup", "interview", "plan", "impl_plan", "tasks", "execute"],
-  "pending": []
-}
+Advance pipeline state (moves `execute` from pending to completed and sets `step` to `done`):
+
+```bash
+PYTHONPATH=${CLAUDE_SKILL_DIR}/lib python3 -m state advance
 ```

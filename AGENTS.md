@@ -28,7 +28,8 @@ Changes here can break existing pipelines mid-run. Only modify with a clear reas
 
 **`impl/`** — concrete implementations. Freely replaceable. Current impls:
 - `impl/interview/ask_user_question.md` — default interview strategy
-- `impl/execute/default.md` — built-in executor (no external dependencies)
+- `impl/execute/default.md` — recommended executor; role-aware subagents for parallel tasks
+- `impl/execute/basic.md` — bare-bones executor, no role context
 - `impl/execute/ralph.md` — delegates to ralph-loop plugin
 - `impl/execute/tdd.md` — TDD protocol on top of ralph
 - `impl/execute/worktree.md` — isolated git worktree per feature, opens PR on completion
@@ -110,12 +111,33 @@ SKILL.md reads the active pipeline dynamically:
 
 This is the only mechanism for reading runtime state into a prompt. Do not replace it with static values.
 
-All python3 state snippets in step files use the same active-pipeline pattern:
-```python
-import os as _os
-_active = open('.pipeline/active').read().strip() if _os.path.exists('.pipeline/active') else 'default'
-_sp = f'.pipeline/{_active}/state.json'
+### State helper library (`lib/state.py`)
+
+All state mutations go through `${CLAUDE_SKILL_DIR}/lib/state.py`. Step files and SKILL.md
+invoke it via:
+
+```bash
+PYTHONPATH=${CLAUDE_SKILL_DIR}/lib python3 -m state <command> [args]
 ```
+
+Available commands: `validate`, `advance`, `rollback-one`, `rollback-to <step>`,
+`skip-to-after <step>...`, `set-impl <component> <value>`, `set-lang <ru|en>`,
+`auto-migrate`, `list-pipelines`, `create-pipeline <name>`, `switch-pipeline <name>`,
+`reset-active`, `emit-event <name> [k=v ...]`, `step-file <step>`, `active-pipeline`, `load`.
+
+For thin reads (just printing one field), use:
+```bash
+PYTHONPATH=${CLAUDE_SKILL_DIR}/lib python3 -c "import state; s=state.load() or {}; print(...)"
+```
+
+**The step sequence lives in `lib/steps.json`** (single source of truth). Never hardcode
+step names or file names in SKILL.md or step files — resolve via `state.STEPS` or
+`python3 -m state step-file <step>`.
+
+**Why a library exists in a "no toolchain" project:** stdlib-only Python (no pip, no
+build), invoked the same way every Claude session does it. The library replaces ~15
+duplicated inline snippets that diverged over time. New code must use it; do not write
+new inline `python3 -c "import json,os; ..."` blocks for state operations.
 
 ---
 
@@ -125,7 +147,9 @@ _sp = f'.pipeline/{_active}/state.json'
    Wrong: `Read skills/armchair-architect/steps/01_init.md`
    Right: `Read ${CLAUDE_SKILL_DIR}/steps/01_init.md`
 
-2. **No build step, no dependencies.** Do not add package.json, requirements.txt, or any toolchain.
+2. **No build step, no third-party dependencies.** Do not add package.json, requirements.txt,
+   or any external toolchain. The one allowed exception is the stdlib-only Python helper at
+   `lib/state.py` (no pip install required) — see "State helper library" above.
 
 3. **Russian `*_ru.md` files are primary for Russian users.** `prd_ru.md`, `plan_ru.md`,
    `implementation_plan_ru.md` are what the user reads and approves. English versions are derived
@@ -145,11 +169,36 @@ _sp = f'.pipeline/{_active}/state.json'
 ## What NOT to Do
 
 - Do not create `.pipeline/` files in this repo — they belong in user projects
-- Do not edit `*_ru.md` files directly in this repo
+- Do not edit pipeline-generated Russian artifacts (`prd_ru.md`, `plan_ru.md`,
+  `implementation_plan_ru.md`) directly in this repo — they are produced in user projects.
+  Repo-owned Russian docs under `docs/` (e.g. refactoring plans) are fine to edit.
 - Do not add abstractions for one-off operations
 - Do not add error handling for cases that cannot happen in normal Claude Code execution
 - Do not change the `steps/` interface without a strong reason — pipelines in progress depend on it
 - Do not hardcode `.pipeline/state.json` — use the active pipeline path pattern
+
+---
+
+## Lite Variant Sync
+
+`skills/armchair-architect-lite/SKILL.md` is a manually-maintained **snapshot** of the
+full pipeline, condensed for single-session use without Claude Code (works in Copilot,
+Cursor, plain LLM chat). It cannot share files with the full variant because those
+environments have no `${CLAUDE_SKILL_DIR}` and no shell injection.
+
+**When changing any of the following in the full pipeline, also update `lite/SKILL.md`:**
+
+| Full pipeline source | Lite section to update |
+|---|---|
+| `steps/01_init.md` — PRD template | Phase 2 — PRD |
+| `steps/04_interview.md` — interview style | Phase 3 — Interview |
+| `steps/05_plan.md` — plan structure | Phase 4 — Plan |
+| `steps/06_impl_plan.md` — impl plan structure | Phase 5 — Implementation Plan |
+| `impl/execute/default.md` — per-task loop | Phase 6 — Execute (Per-step loop) |
+| Stuck task split prompt | Phase 6 — If a step is stuck |
+
+If you skip syncing, lite drifts silently — the next user invoking it gets a stale
+template. There is no automated check. This is a known cost of supporting both variants.
 
 ---
 
@@ -176,5 +225,7 @@ There are no automated tests. Verification is manual and interactive.
 | `SKILL.md` | Entry point, orchestrator, and all routing logic |
 | `steps/NN_<name>.md` | Step contracts (WHAT) |
 | `impl/<component>/<name>.md` | Step implementations (HOW) |
+| `lib/state.py` | Stdlib-only state helpers (load, advance, rollback, emit-event, …) |
+| `lib/steps.json` | Step sequence — single source of truth |
 | `DESIGN.md` | Full architecture and design decisions |
 | `CLAUDE.md` | Instructions for Claude Code working on this repo |

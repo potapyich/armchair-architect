@@ -1,4 +1,4 @@
-# Step 04 — Strategy Plan
+# Step 05 — Strategy Plan
 
 ## Goal
 
@@ -74,16 +74,7 @@ then regenerate the canonical English if needed. Repeat until explicit approval.
 Advance pipeline state:
 
 ```bash
-python3 -c "
-import json
-import os as _os; _active = open('.pipeline/active').read().strip() if _os.path.exists('.pipeline/active') else 'default'; _sp = f'.pipeline/{_active}/state.json'
-with open(_sp) as f: s = json.load(f)
-cur = s['step']
-s['completed'] = s.get('completed', []) + [cur]
-s['pending'] = [x for x in s.get('pending', []) if x != cur]
-s['step'] = s['pending'][0] if s['pending'] else 'done'
-with open(_sp, 'w') as f: json.dump(s, f, indent=2)
-"
+PYTHONPATH=${CLAUDE_SKILL_DIR}/lib python3 -m state advance
 ```
 
 ### 7. Confirm

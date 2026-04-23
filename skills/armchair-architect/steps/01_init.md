@@ -100,20 +100,11 @@ Apply any corrections, then proceed.
 
 ### 8. Update state
 
-Advance pipeline state — move current step to completed, set next step from pending:
+Save the detected language, then advance pipeline state:
 
 ```bash
-python3 -c "
-import json
-import os as _os; _active = open('.pipeline/active').read().strip() if _os.path.exists('.pipeline/active') else 'default'; _sp = f'.pipeline/{_active}/state.json'
-with open(_sp) as f: s = json.load(f)
-cur = s['step']
-s['completed'] = s.get('completed', []) + [cur]
-s['pending'] = [x for x in s.get('pending', []) if x != cur]
-s['step'] = s['pending'][0] if s['pending'] else 'done'
-s['lang'] = '<detected lang>'
-with open(_sp, 'w') as f: json.dump(s, f, indent=2)
-"
+PYTHONPATH=${CLAUDE_SKILL_DIR}/lib python3 -m state set-lang <detected lang>
+PYTHONPATH=${CLAUDE_SKILL_DIR}/lib python3 -m state advance
 ```
 
 Replace `<detected lang>` with `ru` or `en`.
